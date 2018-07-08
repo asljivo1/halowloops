@@ -104,6 +104,11 @@ public:
      * Get i-th Station's AID.
    */
     uint32_t GetAID (uint32_t i) const;
+
+    /*
+     * Get all station's AIDs.
+     * */
+    std::vector<uint32_t> GetAids(void) const;
 private:
     uint32_t m_staType;
     uint32_t m_channelWidth;
@@ -220,11 +225,6 @@ private:
    * \param aid the AID received from assoc response frame
    */
   void SetAID (uint32_t aid, uint32_t i = 0);
-
-  /*
-   * Get all station's AIDs.
-   * */
-  std::vector<uint32_t> GetAids(void) const;
 
   void AddAID (uint32_t aid);
 

@@ -24,7 +24,7 @@ class NodeEntry {
 public:
     int id;
 
-    uint32_t aId = 8192; // unassociated is 8192
+    std::vector<uint32_t> aids; // unassociated is 8192
     uint16_t rpsIndex = 0;
     uint8_t rawGroupNumber = 0;
     uint8_t rawSlotIndex = 0;

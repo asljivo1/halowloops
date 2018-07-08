@@ -1184,6 +1184,15 @@ StaWifiMac::TryToEnsureAssociated (void)
          we get an assoc response.
        */
       break;
+    case WAIT_ANOTHER_ASSOC_RESP:
+    	/* we are already associated but we have sent another
+    	 * association request to obtain one more (virtual) AID.
+    	 * Until we obtain the new AID, we continue using available
+    	 * ones. When we obtain the new AID, we use all our AIDs.
+    	 * Wait until either assoc-request-timeout or until
+    	 * we get an assoc response.
+    	 * */
+    	break;
     case REFUSED:
     case WAIT_DISASSOC_ACK:
       /* we have sent an assoc request and received a negative
@@ -1196,9 +1205,12 @@ StaWifiMac::TryToEnsureAssociated (void)
 void
 StaWifiMac::AssocRequestTimeout (void)
 {
-  NS_LOG_FUNCTION (this);
-  SetState (WAIT_ASSOC_RESP);
-  SendAssociationRequest ();
+	NS_LOG_FUNCTION(this);
+	if (this->IsAssociated())
+		SetState(WAIT_ANOTHER_ASSOC_RESP);
+	else
+		SetState(WAIT_ASSOC_RESP);
+	SendAssociationRequest();
 }
 
 void
@@ -1244,13 +1256,13 @@ StaWifiMac::RestartBeaconWatchdog (Time delay)
 bool
 StaWifiMac::IsAssociated (void) const
 {
-  return m_state == ASSOCIATED;
+  return m_state == ASSOCIATED || m_state == WAIT_ANOTHER_ASSOC_RESP;
 }
 
 bool
 StaWifiMac::IsWaitAssocResp (void) const
 {
-  return m_state == WAIT_ASSOC_RESP;
+  return m_state == WAIT_ASSOC_RESP || m_state == WAIT_ANOTHER_ASSOC_RESP;
 }
 
 bool
@@ -1693,9 +1705,9 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         }
       return;
     }
-  else if (hdr->IsAssocResp () || m_state == WAIT_ANOTHER_ASSOC_RESP)
+  else if (hdr->IsAssocResp ())
     {
-      if (m_state == WAIT_ASSOC_RESP)
+      if (m_state == WAIT_ASSOC_RESP || m_state == WAIT_ANOTHER_ASSOC_RESP)
         {
           MgtAssocResponseHeader assocResp;
           packet->RemoveHeader (assocResp);
@@ -1708,19 +1720,19 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         	  AddAID(assocResp.GetAID());
         	  SetState (ASSOCIATED);
         	  if (testtrackit)
-        		  NS_LOG_DEBUG("[" << this->GetAddress() <<"] is associated and has AID = " << this->GetAID(0));
+        		  NS_LOG_DEBUG("[" << this->GetAddress() <<"] is associated and has AID = " << this->GetAID(0) << " at " << Simulator::Now());
 
-        	  /*if (GetAID (0) == 1 && Simulator::Now() < Seconds (10))
-        		  Simulator::Schedule(Seconds(10), &StaWifiMac::SendAnotherAssociationRequest, this);
+        	  if (GetAID(0) == 1 && m_aids.size() == 1)
+        		  SendAnotherAssociationRequest ();
         	  else if (GetAids ().size() > 1)
         	  {
-        		  SetState(ASSOCIATED);
-        		  std::cout << "++++++++++++++++++++++++++all AIDs = ";
+        		  //SetState(ASSOCIATED);
+        		  std::cout << "++++++++++++++++++++++++++ all my AIDs = " << ", now=" << Simulator::Now();
         		  for (auto aid : GetAids())
         			  std::cout << "   " << aid;
         		  std::cout << std::endl;
         		  return;
-        	  }*/
+        	  }
               SupportedRates rates = assocResp.GetSupportedRates ();
               if (m_htSupported)
                 {
@@ -1845,7 +1857,7 @@ StaWifiMac::SetState (MacState value)
 			OnAssociated();
 
 		}
-		else if (value != ASSOCIATED && m_state == ASSOCIATED)
+		else if (value != ASSOCIATED && value != WAIT_ANOTHER_ASSOC_RESP && m_state == ASSOCIATED)
 		{
 			OnDeassociated();
 

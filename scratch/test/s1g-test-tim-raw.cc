@@ -177,7 +177,8 @@ RPSVector configureRAW (RPSVector rpslist, string RAWConfigFile)
 			//config.nRawGroupsPerRpsList.push_back(NRAWPERBEACON);
 		}
 		myfile.close();
-		config.NRawSta = rpslist.rpsset[rpslist.rpsset.size()-1]->GetRawAssigmentObj(NRAWPERBEACON-1).GetRawGroupAIDEnd();
+		config.NRawSta = totalNumSta;
+				//rpslist.rpsset[rpslist.rpsset.size()-1]->GetRawAssigmentObj(NRAWPERBEACON-1).GetRawGroupAIDEnd();
 	}
 	else
 	{
@@ -318,8 +319,11 @@ void updateNodesQueueLength() {
 }
 
 void onSTAAssociated(int i) {
-	cout << "Node " << std::to_string(i) << " is associated and has aid "
-			<< nodes[i]->aId << endl;
+	cout << "Node " << std::to_string(i) << " is associated and has aids:";
+	for (auto aid : nodes[i]->aids)
+		std::cout << "   " << aid;
+	std::cout << std::endl;
+
 
 	for (int k = 0; k < config.rps.rpsset.size(); k++) {
 		for (int j = 0; j < config.rps.rpsset[k]->GetNumberOfRawGroups(); j++) {
@@ -330,7 +334,7 @@ void onSTAAssociated(int i) {
 				nodes[i]->rpsIndex = k + 1;
 				nodes[i]->rawGroupNumber = j + 1;
 				nodes[i]->rawSlotIndex =
-						nodes[i]->aId
+						nodes[i]->aids[nodes[i]->aids.size() - 1]
 								% config.rps.rpsset[k]->GetRawAssigmentObj(j).GetSlotNum()
 								+ 1;
 				/*cout << "Node " << i << " with AID " << (int)nodes[i]->aId << " belongs to " << (int)nodes[i]->rawSlotIndex << " slot of RAW group "
@@ -344,7 +348,7 @@ void onSTAAssociated(int i) {
 
 	// RPS, Raw group and RAW slot assignment
 
-	if (GetAssocNum() == config.Nsta) {
+	if (GetAssocNum() == config.Nsta && nodes[i]->aids[nodes[i]->aids.size() - 1] <= config.Nsta) {
 		cout << "All " << AssocNum << " stations associated at " << Simulator::Now ().GetMicroSeconds () <<", configuring clients & server" << endl;
 
 		// association complete, start sending packets
@@ -1516,9 +1520,9 @@ int main(int argc, char *argv[]) {
 	//LogComponentEnable ("CoapClient", LOG_LEVEL_INFO);
 	//LogComponentEnable ("CoapServer", LOG_LEVEL_INFO);
 
-	LogComponentEnable ("ApWifiMac", LOG_LEVEL_DEBUG);
+	//LogComponentEnable ("ApWifiMac", LOG_LEVEL_DEBUG);
 	//LogComponentEnable ("StaWifiMac", LOG_LEVEL_DEBUG);
-	LogComponentEnable ("EdcaTxopN", LOG_LEVEL_DEBUG);
+	//LogComponentEnable ("EdcaTxopN", LOG_LEVEL_DEBUG);
 	//LogComponentEnable ("MacLow", LOG_LEVEL_DEBUG);
 
 	bool OutputPosition = true;

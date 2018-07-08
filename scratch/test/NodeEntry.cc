@@ -14,6 +14,7 @@ Time NodeEntry::maxJitter = Time::Min();
 
 NodeEntry::NodeEntry(int id, Statistics* stats, Ptr<Node> node, Ptr<NetDevice> device) :
 				id(id), stats(stats), node(node), device(device) {
+	aids.push_back(8192);
 }
 
 void NodeEntry::SetAssociation(std::string context, Mac48Address address) {
@@ -24,8 +25,10 @@ void NodeEntry::SetAssociation(std::string context, Mac48Address address) {
 			"/NodeList/" + std::to_string(this->id)
 	+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::StaWifiMac/");
 	auto obj = matches.Get(0)->GetObject<StaWifiMac>();
-	this->aId = obj->GetAID(0);
+	this->aids[0] = this->aids[0] != 8192 ? this->aids[0] : obj->GetAID(0);
 
+	if (obj->GetAids().size() > 1)
+		this->aids.push_back(obj->GetAID(1));
 	//cout << "Associated with aId " << this->aId;
 
 	this->associatedCallback();
@@ -50,7 +53,7 @@ void NodeEntry::OnS1gBeaconMissed(std::string context, bool nextBeaconIsDTIM) {
 }
 
 void NodeEntry::OnPhyTxBegin(std::string context, Ptr<const Packet> packet) {
-	if(showLog) cout << Simulator::Now().GetMicroSeconds() << " [" << this->aId << "] "
+	if(showLog) cout << Simulator::Now().GetMicroSeconds() << " [" << this->aids[0] << "] "
 			<< "Begin Tx " << packet->GetUid() << endl;
 	txMap.emplace(packet->GetUid(), Simulator::Now());
 
@@ -67,7 +70,7 @@ void NodeEntry::OnPhyTxBegin(std::string context, Ptr<const Packet> packet) {
 }
 
 void NodeEntry::OnPhyTxEnd(std::string context, Ptr<const Packet> packet) {
-	if(showLog) cout << Simulator::Now().GetMicroSeconds() << " [" << this->aId << "] "
+	if(showLog) cout << Simulator::Now().GetMicroSeconds() << " [" << aids[0] << "] "
 			<< "End Tx " << packet->GetUid() << endl;
 
 	if (txMap.find(packet->GetUid()) != txMap.end()) {
@@ -81,7 +84,7 @@ void NodeEntry::OnPhyTxEnd(std::string context, Ptr<const Packet> packet) {
 }
 
 void NodeEntry::OnPhyTxDrop(std::string context, Ptr<const Packet> packet, DropReason reason) {
-	if(showLog) cout << "[" << this->aId << "] " << "Tx Dropped " << packet->GetUid()
+	if(showLog) cout << "[" << this->aids[0] << "] " << "Tx Dropped " << packet->GetUid()
 					<< endl;
 
 	if (txMap.find(packet->GetUid()) != txMap.end()) {
@@ -157,15 +160,20 @@ void NodeEntry::OnEndOfReceive(Ptr<const Packet> packet) {
 				 cout << endl;
 				 */
 				bool inPage = false;
-				if (pageBitmapLen) {
-					uint8_t myBlock = (this->aId >> 6) & 0x1f;
-					uint8_t Ind, offset;
-					Ind = myBlock / 8;
-					offset = myBlock % 8;
-					inPage = s1gBeaconHeader.GetpageSlice().GetPageBitmap()[Ind] & (1 << offset);
-					// there is pending data at the AP
-					if (inPage)
-						rawTIMGroupFlaggedAsDataAvailableInDTIM = true;
+				if (pageBitmapLen)
+				{
+					for (int kk=0; kk < aids.size(); kk++)
+					{
+						uint32_t aid = this->aids[kk];
+						uint8_t myBlock = (aid >> 6) & 0x1f;
+						uint8_t Ind, offset;
+						Ind = myBlock / 8;
+						offset = myBlock % 8;
+						inPage = s1gBeaconHeader.GetpageSlice().GetPageBitmap()[Ind] & (1 << offset);
+						// there is pending data at the AP
+						if (inPage)
+							rawTIMGroupFlaggedAsDataAvailableInDTIM = true;
+					}
 				}
 				else if (!inPage)
 				{
@@ -341,7 +349,7 @@ SeqTsHeader GetSeqTSFromPacket(Ptr<const Packet> packet) {
 void NodeEntry::OnTcpPacketSent(Ptr<const Packet> packet) {
 
 	//SeqTsHeader seqTs = GetSeqTSFromPacket(packet);
-	if(showLog) cout << Simulator::Now().GetMicroSeconds() << " [" << this->aId << "] " << "TCP packet sent " << endl;//with seq nr " << seqTs.GetSeq() << endl;
+	if(showLog) cout << Simulator::Now().GetMicroSeconds() << " [" << this->aids[0] << "] " << "TCP packet sent " << endl;//with seq nr " << seqTs.GetSeq() << endl;
 
 	/*
 	// the packet is just sent, so track if it's received by a list of booleans
@@ -734,24 +742,24 @@ void NodeEntry::OnTransmissionWillCrossRAWBoundary(std::string context, Time txD
 }
 
 void NodeEntry::OnMacTxRtsFailed(std::string context, Mac48Address address) {
-	//cout  << Simulator::Now().GetMicroSeconds() << " [" << this->aId << "] "
+	//cout  << Simulator::Now().GetMicroSeconds() << " [" << this->aids[0] << "] "
 	//	<< " MAC Tx Rts Failed" << endl;
 	stats->get(this->id).NumberOfMACTxRTSFailed++;
 }
 
 void NodeEntry::OnMacTxDataFailed(std::string context, Mac48Address address) {
-	//cout  << Simulator::Now().GetMicroSeconds() << " [" << this->aId << "] "
+	//cout  << Simulator::Now().GetMicroSeconds() << " [" << this->aids[0] << "] "
 	//		<< " MAC Tx Data Failed" << endl;
 	stats->get(this->id).NumberOfMACTxMissedACK++;
 }
 
 void NodeEntry::OnMacTxFinalRtsFailed(std::string context, Mac48Address address) {
-	//cout  << Simulator::Now().GetMicroSeconds() << " [" << this->aId << "] "
+	//cout  << Simulator::Now().GetMicroSeconds() << " [" << this->aids[0] << "] "
 	stats->get(this->id).NumberOfMACTxRTSFailed++;
 }
 
 void NodeEntry::OnMacTxFinalDataFailed(std::string context, Mac48Address address) {
-	//cout  << Simulator::Now().GetMicroSeconds() << " [" << this->aId << "] "
+	//cout  << Simulator::Now().GetMicroSeconds() << " [" << this->aids[0] << "] "
 	//		<< " MAC Tx Final data Failed" << endl;
 	stats->get(this->id).NumberOfMACTxMissedACKAndDroppedPacket++;
 }
