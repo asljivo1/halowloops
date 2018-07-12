@@ -1644,7 +1644,7 @@ int main(int argc, char *argv[]) {
 	mac.SetType ("ns3::ApWifiMac",
 	                 "Ssid", SsidValue (ssid),
 	                 "BeaconInterval", TimeValue (MicroSeconds(config.BeaconInterval)),
-	                 "NRawStations", UintegerValue (config.NRawSta),
+	                 "NRawStations", UintegerValue (config.Nsta),
 	                 "RPSsetup", RPSVectorValue (config.rps),
 	                 "PageSliceSet", pageSliceValue (config.pageS),
 	                 "TIMSet", TIMValue (config.tim)

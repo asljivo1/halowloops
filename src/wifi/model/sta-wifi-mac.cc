@@ -1723,7 +1723,8 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         		  NS_LOG_DEBUG("[" << this->GetAddress() <<"] is associated and has AID = " << this->GetAID(0) << " at " << Simulator::Now());
 
         	  if (GetAID(0) == 1 && m_aids.size() == 1)
-        		  SendAnotherAssociationRequest ();
+        		  Simulator::Schedule(Seconds(4), &StaWifiMac::SendAnotherAssociationRequest, this);
+        	  //SendAnotherAssociationRequest ();
         	  else if (GetAids ().size() > 1)
         	  {
         		  //SetState(ASSOCIATED);

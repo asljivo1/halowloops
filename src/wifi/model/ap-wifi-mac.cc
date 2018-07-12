@@ -187,6 +187,7 @@ ApWifiMac::ApWifiMac ()
   m_supportPageSlicingList.clear();
   m_sleepList.clear ();
   m_DTIMCount = 0;
+  m_updateRps = false;
   //m_DTIMOffset = 0;
 }
 
@@ -1051,6 +1052,94 @@ ApWifiMac::SendOneBeacon (void)
       beacon.SetBeaconCompatibility (compatibility);
      
       RPS *m_rps;
+      if (m_updateRps)
+      {
+    	  m_updateRps = false;
+    	  RPS* newRps = new RPS;
+
+    	  for (auto& rps : m_rpsset.rpsset)
+    	  {
+    		  //Assumption 1: First RAW is always loop-RAW and all loop-RAWs have the same duration
+    		  Time loopSlotDurationTotal = 2 * m_loopAids.size() * rps->GetRawAssigmentObj(0).GetSlotDuration();
+
+    		  //Assumption 2: In intial RAW setup, all sensors are in a single RAW
+    		  Time remainingTime = m_beaconInterval - loopSlotDurationTotal - MicroSeconds (5600);
+    		  NS_ASSERT (remainingTime > Time ());
+
+    		  // fins number of slots total in sensors' RAWs
+    		  uint16_t numSlots = 0;
+    		  for (uint32_t g = 0; g < rps->GetNumberOfRawGroups(); g++)
+    		  {
+    			  auto rawg = rps->GetRawAssigmentObj(g);
+    			  if (rawg.GetRawGroupAIDStart() != rawg.GetRawGroupAIDEnd())
+    			  {
+    				  numSlots += rawg.GetSlotNum();
+    			  }
+    		  }
+    		  uint16_t sensorCount = (remainingTime.GetMicroSeconds() / numSlots - 500) / 120;
+    		  RPS::RawAssignment *newRaw = new RPS::RawAssignment;
+    		  newRaw->SetRawControl(rps->GetRawAssigmentObj(0).GetRawControl());
+    		  newRaw->SetSlotCrossBoundary(rps->GetRawAssigmentObj(0).GetSlotCrossBoundary());
+    		  newRaw->SetSlotFormat(rps->GetRawAssigmentObj(0).GetSlotFormat());
+    		  uint32_t sensor_aid_start = rps->GetRawAssigmentObj(1).GetRawGroupAIDStart();
+    		  uint32_t sensor_aid_end = rps->GetRawAssigmentObj(1).GetRawGroupAIDEnd();
+    		  uint32_t numSensors = sensor_aid_end - sensor_aid_start + 1;
+    		  for (uint32_t t = 0; t < 2; t++)
+    		  {
+    			  // loops
+    			  for (std::vector<uint32_t>& aidVec : m_loopAids)
+    			  {
+    				  newRaw->SetSlotDurationCount(rps->GetRawAssigmentObj(0).GetSlotDurationCount()); //in initial RAW config 0th was loop
+    				  newRaw->SetSlotNum(1);
+    				  uint32_t page = rps->GetRawAssigmentObj(0).GetRawGroupPage();
+    				  uint32_t aid_start = aidVec[t];
+    				  uint32_t aid_end = aidVec[t];
+    				  uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | page;
+    				  newRaw->SetRawGroup(rawinfo);
+
+    				  std::cout << "*** Loop aid: " << aid_start << "-" << aid_end << std::endl;
+    			  }
+
+    			  // sensors
+    			  newRaw->SetSlotDurationCount(sensorCount);
+    			  uint16_t ns = numSlots > 1 ? numSlots/2 : numSlots;
+    			  if (numSlots % 2 != 0 && numSlots > 1 && t > 0)
+    				  ns++;
+    			  newRaw->SetSlotNum(ns);
+    			  uint32_t page = rps->GetRawAssigmentObj(0).GetRawGroupPage();
+    			  uint32_t aid_start = t == 0 ? sensor_aid_start : numSensors/2 + 1;
+    			  uint32_t aid_end = t == 0 ? numSensors/2 : sensor_aid_end;
+    			  uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | page;
+    			  newRaw->SetRawGroup(rawinfo);
+    			  std::cout << "*** Sensor aid: " << aid_start << "-" << aid_end << std::endl;
+    			  std::cout << "         count= " << (int)sensorCount << ", numslots=" << ns << std::endl;
+    			  newRps->SetRawAssignment(*newRaw);
+    		  }
+    		  delete newRaw;
+    	  }
+    	  std::cout << "PRIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;
+    	  uint32_t loopCount = m_rpsset.rpsset.at(0)->GetRawAssigmentObj(0).GetSlotDurationCount();
+    	  m_rpsset.rpsset.clear();
+    	  m_rpsset.rpsset.push_back(newRps);
+    	  //delete newRps;
+    	  std::cout << "POSLIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;
+      }
+      for (auto& rps : m_rpsset.rpsset)
+      {
+    	  for (int i=0; i<rps->GetNumberOfRawGroups(); i++)
+    	  {
+    		  std::cout << "RAW nr " << i << std::endl;
+    		  std::cout << "	control=" << (int)rps->GetRawAssigmentObj(i).GetRawControl();
+    		  std::cout << "	csb=" << (int)rps->GetRawAssigmentObj(i).GetSlotCrossBoundary();
+    		  std::cout << "	format=" << (int)rps->GetRawAssigmentObj(i).GetSlotFormat();
+    		  std::cout << "	count=" << (int)rps->GetRawAssigmentObj(i).GetSlotDurationCount();
+    		  std::cout << "	numslots=" << (int)rps->GetRawAssigmentObj(i).GetSlotNum();
+    		  std::cout << "	aidstart=" << (int)rps->GetRawAssigmentObj(i).GetRawGroupAIDStart();
+    		  std::cout << "	aidend=" << (int)rps->GetRawAssigmentObj(i).GetRawGroupAIDEnd();
+    		  std::cout << std::endl;
+    	  }
+      }
+
       if (RpsIndex < m_rpsset.rpsset.size())
          {
             m_rps = m_rpsset.rpsset.at(RpsIndex);
@@ -1093,16 +1182,6 @@ ApWifiMac::SendOneBeacon (void)
     {
     	NS_LOG_DEBUG ("***TIM" << (int)m_DTIMCount << "*** starts at " << Simulator::Now().GetSeconds() << " s");
     }
-    
-      /*
-      RPS m_rps;
-      NS_LOG_UNCOND ("send beacon at" << Simulator::Now ());
-      m_S1gRawCtr.deleteRps ();
-      m_rps = m_S1gRawCtr.UpdateRAWGroupping (m_sensorList, m_OffloadList, m_receivedAid, m_beaconInterval.GetMicroSeconds (), m_outputpath);
-      m_receivedAid.clear (); //release storage
-      //m_rps = m_S1gRawCtr.GetRPS ();
-      beacon.SetRPS (m_rps); */
-      
 
     m_DTIMPeriod = m_TIM.GetDTIMPeriod ();
     m_TIM.SetDTIMCount (m_DTIMCount);
@@ -1547,6 +1626,19 @@ ApWifiMac::TxOk (const WifiMacHeader &hdr)
     {
       NS_LOG_DEBUG ("associated with sta=" << hdr.GetAddr1 ());
       m_stationManager->RecordGotAssocTxOk (hdr.GetAddr1 ());
+
+      //virtualaid change RAW config
+      std::vector<uint32_t> aidList;
+	  for (auto it = m_AidToMacAddr.begin(); it != m_AidToMacAddr.end(); it++)
+	  {
+		  if (it->second == hdr.GetAddr1 ())
+			  aidList.push_back(it->first);
+	  }
+	  if (aidList.size() > 1)
+	  {
+		  m_loopAids.push_back(aidList);
+		  m_updateRps = true;
+	  }
     }
 }
 

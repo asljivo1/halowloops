@@ -25,7 +25,7 @@ SimulationEventManager::SimulationEventManager(string hostname, int port, string
 void SimulationEventManager::onStart(Configuration& config) {
 	m_config = config;
 	send({"start",
-		  std::to_string(config.NRawSta),
+		  std::to_string(config.Nsta),
 		  config.DataMode,
 		  "",
 		  "",

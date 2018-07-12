@@ -1085,7 +1085,8 @@ struct WifiRemoteStationState
     BRAND_NEW,
     DISASSOC,
     WAIT_ASSOC_TX_OK,
-    GOT_ASSOC_TX_OK
+    GOT_ASSOC_TX_OK,
+    WAIT_ANOTHER_ASSOC_TX_OK
   } m_state;
 
   /**

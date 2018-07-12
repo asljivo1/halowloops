@@ -331,6 +331,8 @@ private:
   static uint16_t RpsIndex;
   Time m_bufferTimeToAllowBeaconToBeReceived;
   Time m_sharedSlotDuration;
+  std::vector<std::vector<uint32_t> > m_loopAids;
+  bool m_updateRps;
 };
 
 } //namespace ns3
