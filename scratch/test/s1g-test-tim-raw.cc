@@ -1636,7 +1636,7 @@ int main(int argc, char *argv[]) {
 	wifi.SetRemoteStationManager ("ns3::ConstantRateWifiManager","DataMode", DataRate, "ControlMode", DataRate);
 
 	mac.SetType("ns3::StaWifiMac", "Ssid", SsidValue(ssid), "ActiveProbing",
-			BooleanValue(false));
+			BooleanValue(false), "VirtualAidsEnabled", BooleanValue(config.enableVirtualAids));
 
 	NetDeviceContainer staDevice;
 	staDevice = wifi.Install(phy, mac, wifiStaNode);

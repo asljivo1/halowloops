@@ -1066,7 +1066,7 @@ ApWifiMac::SendOneBeacon (void)
     		  Time remainingTime = m_beaconInterval - loopSlotDurationTotal - MicroSeconds (5600);
     		  NS_ASSERT (remainingTime > Time ());
 
-    		  // fins number of slots total in sensors' RAWs
+    		  // finds number of slots total in sensors' RAWs
     		  uint16_t numSlots = 0;
     		  for (uint32_t g = 0; g < rps->GetNumberOfRawGroups(); g++)
     		  {

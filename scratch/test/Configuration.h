@@ -28,6 +28,7 @@ struct Configuration {
 	RPSVector rps;
 	uint32_t nRps;						// Ordinal number of current RPS element; RPS Index
 	uint64_t totalRawSlots = 0;			// Total number of RAW slots in all RAW groups in all RPS elements
+	bool enableVirtualAids=false;
 
 	UintegerValue maxNumberOfPackets = 10; ///4294967295u
 	string trafficType = "udpecho"; // important - udp is considered to be only uplink in NodeStatistics::GetPacketLoss tcpipcamera tcpfirmware

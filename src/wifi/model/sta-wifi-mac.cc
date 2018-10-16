@@ -109,6 +109,11 @@ StaWifiMac::GetTypeId (void)
                    MakeUintegerAccessor (&StaWifiMac::GetChannelWidth,
                                          &StaWifiMac::SetChannelWidth),
                    MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("NumOfLoops",
+                   "Number of control loops.",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&StaWifiMac::m_numLoops),
+                   MakeUintegerChecker<uint32_t> ())
     .AddAttribute ("ActiveProbing",
                    "If true, we send probe requests. If false, we don't."
                    "NOTE: if more than one STA in your simulation is using active probing, "
@@ -117,6 +122,11 @@ StaWifiMac::GetTypeId (void)
                    "See bug 1060 for more info.",
                    BooleanValue (false),
                    MakeBooleanAccessor (&StaWifiMac::SetActiveProbing, &StaWifiMac::GetActiveProbing),
+                   MakeBooleanChecker ())
+    .AddAttribute ("VirtualAidsEnabled",
+                   "If true, we use virtual AIDs. If not, we don't.",
+                   BooleanValue (false),
+                   MakeBooleanAccessor (&StaWifiMac::m_enabledVirtualAIDs),
                    MakeBooleanChecker ())
     .AddTraceSource ("Assoc", "Associated with an access point.",
                      MakeTraceSourceAccessor (&StaWifiMac::m_assocLogger),
@@ -1722,7 +1732,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         	  if (testtrackit)
         		  NS_LOG_DEBUG("[" << this->GetAddress() <<"] is associated and has AID = " << this->GetAID(0) << " at " << Simulator::Now());
 
-        	  if (GetAID(0) == 1 && m_aids.size() == 1)
+        	  if (m_enabledVirtualAIDs && GetAID(0) == 1 && m_aids.size() == 1)
         		  Simulator::Schedule(Seconds(4), &StaWifiMac::SendAnotherAssociationRequest, this);
         	  //SendAnotherAssociationRequest ();
         	  else if (GetAids ().size() > 1)

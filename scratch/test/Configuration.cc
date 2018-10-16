@@ -40,6 +40,7 @@ Configuration::Configuration(int argc, char *argv[]) {
     cmd.AddValue("nControlLoops", "Number of control loops. If -1 all the stations will be in the loops if NSta is even", nControlLoops);
     cmd.AddValue("PrintStats", "Print statistics of each node to ./results-coap/", PrintStats);
     cmd.AddValue("CycleTime", "Cycle time of all control loops", cycleTime);
+    cmd.AddValue("EnableVirtualAids", "Enable the use of virtual AIDs", enableVirtualAids);
 
 /*
     cmd.AddValue("SlotFormat", "format of NRawSlotCount, -1 will auto calculate based on raw slot num", SlotFormat);

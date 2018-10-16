@@ -346,6 +346,9 @@ private:
 
   TracedCallback<Mac48Address> m_assocLogger;
   TracedCallback<Mac48Address> m_deAssocLogger;
+
+  uint32_t m_numLoops;
+  bool m_enabledVirtualAIDs;
 };
 
 } //namespace ns3
