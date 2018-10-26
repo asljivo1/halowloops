@@ -3,10 +3,10 @@
 # 1. Paste all NSS files you want to compare to folder ahVisualizer/forwardsocketdata/compare
 # 2. run this script
 
-targetdir="../../ahvisualizer/forwardsocketdata/simulations/compare/"
-rm ../../ahvisualizer/forwardsocketdata/simulations/compare/*
-cp nssfiles/* ../../ahvisualizer/forwardsocketdata/simulations/compare/
-cp nssfiles/* ../../ahvisualizer/forwardsocketdata/simulations/
+targetdir="../../ahVisualizer/forwardsocketdata/simulations/compare/"
+rm ../../ahVisualizer/forwardsocketdata/simulations/compare/*
+cp nssfiles/* ../../ahVisualizer/forwardsocketdata/simulations/compare/
+cp nssfiles/* ../../ahVisualizer/forwardsocketdata/simulations/
 
 querystring=""
 
