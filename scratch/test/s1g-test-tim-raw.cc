@@ -1247,7 +1247,7 @@ void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 {
 	clientHelper.SetAttribute("MaxPackets", config.maxNumberOfPackets);
 	clientHelper.SetAttribute("Interval", TimeValue(MilliSeconds(config.cycleTime)));
-	clientHelper.SetAttribute("IntervalDeviation", TimeValue(MilliSeconds(config.cycleTime/10)));
+	clientHelper.SetAttribute("IntervalDeviation", TimeValue(MilliSeconds(0)));//MilliSeconds(config.cycleTime/10)
 	clientHelper.SetAttribute("PayloadSize", UintegerValue(config.payloadSize));
 	clientHelper.SetAttribute("RequestMethod", UintegerValue(3));
 	clientHelper.SetAttribute("MessageType", UintegerValue(0));
@@ -1363,6 +1363,26 @@ void printStatsToFile (bool print)
 				os << "Inter-packet delay deviation at client=" << stats.get(i).GetInterPacketDelayDeviation(stats.get(i).m_interPacketDelayClient) << "==" << stats.get(i).GetInterPacketDelayDeviationPercentage(stats.get(i).m_interPacketDelayClient) << endl;
 				os << "Inter-packet delay deviation at server=" << stats.get(i).GetInterPacketDelayDeviation(stats.get(i).m_interPacketDelayServer) << "==" << stats.get(i).GetInterPacketDelayDeviationPercentage(stats.get(i).m_interPacketDelayServer) << endl;
 				os << "\n";
+				os << "Packet seqs:\n";
+				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_sentTimeBySeqClient.begin(); it != stats.get(i).m_sentTimeBySeqClient.end(); ++it)
+					os << it->first << " ";
+				os << endl;
+				os << "Times sent [ms]:\n";
+				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_sentTimeBySeqClient.begin(); it != stats.get(i).m_sentTimeBySeqClient.end(); ++it)
+					os << it->second.GetMilliSeconds() << " ";
+				os << endl;
+				os << "Times received [ms]:\n";
+				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_receivedTimeBySeqClient.begin(); it != stats.get(i).m_receivedTimeBySeqClient.end(); ++it)
+					os << it->second.GetMilliSeconds() << " ";
+				os << endl;
+				os << "Time diff sent-received [ms]:\n";
+				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_sentTimeBySeqClient.begin(); it != stats.get(i).m_sentTimeBySeqClient.end(); ++it)
+					//if (stats.get(i).m_receivedTimeBySeqClient[it->first])
+						os << stats.get(i).m_receivedTimeBySeqClient[it->first].GetMilliSeconds() - it->second.GetMilliSeconds() << " ";
+					/*else
+						os << "X";*/
+
+				os << endl;
 				os << "Goodput=" << (stats.get(i).getGoodputKbit(stats.TimeWhenEverySTAIsAssociated)) << "Kbit" << endl; //CORRECT
 			}
 			else
@@ -1517,12 +1537,12 @@ int main(int argc, char *argv[]) {
 	//LogComponentEnable ("UdpServer", LOG_LEVEL_INFO);
 	//LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
 	//LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
-	//LogComponentEnable ("CoapClient", LOG_LEVEL_INFO);
-	//LogComponentEnable ("CoapServer", LOG_LEVEL_INFO);
+	LogComponentEnable ("CoapClient", LOG_LEVEL_INFO);
+	LogComponentEnable ("CoapServer", LOG_LEVEL_INFO);
 
-	//LogComponentEnable ("ApWifiMac", LOG_LEVEL_DEBUG);
-	//LogComponentEnable ("StaWifiMac", LOG_LEVEL_DEBUG);
-	//LogComponentEnable ("EdcaTxopN", LOG_LEVEL_DEBUG);
+	LogComponentEnable ("ApWifiMac", LOG_LEVEL_INFO);
+	LogComponentEnable ("StaWifiMac", LOG_LEVEL_INFO);
+	LogComponentEnable ("EdcaTxopN", LOG_LEVEL_DEBUG);
 	//LogComponentEnable ("MacLow", LOG_LEVEL_DEBUG);
 
 	bool OutputPosition = true;

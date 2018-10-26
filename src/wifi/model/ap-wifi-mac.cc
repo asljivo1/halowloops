@@ -1117,14 +1117,14 @@ ApWifiMac::SendOneBeacon (void)
     		  }
     		  delete newRaw;
     	  }
-    	  std::cout << "PRIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;
+    	  //std::cout << "PRIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;
     	  uint32_t loopCount = m_rpsset.rpsset.at(0)->GetRawAssigmentObj(0).GetSlotDurationCount();
     	  m_rpsset.rpsset.clear();
     	  m_rpsset.rpsset.push_back(newRps);
     	  //delete newRps;
-    	  std::cout << "POSLIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;
+    	  //std::cout << "POSLIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;
       }
-      for (auto& rps : m_rpsset.rpsset)
+      /*for (auto& rps : m_rpsset.rpsset)
       {
     	  for (int i=0; i<rps->GetNumberOfRawGroups(); i++)
     	  {
@@ -1138,7 +1138,7 @@ ApWifiMac::SendOneBeacon (void)
     		  std::cout << "	aidend=" << (int)rps->GetRawAssigmentObj(i).GetRawGroupAIDEnd();
     		  std::cout << std::endl;
     	  }
-      }
+      }*/
 
       if (RpsIndex < m_rpsset.rpsset.size())
          {

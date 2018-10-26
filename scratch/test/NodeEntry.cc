@@ -517,6 +517,11 @@ void NodeEntry::OnUdpEchoPacketReceived(Ptr<const Packet> packet, Address from) 
 
 void NodeEntry::OnCoapPacketSent(Ptr<const Packet> packet) {
 	stats->get(this->id).NumberOfSentPackets++;
+	auto pcopy = packet->Copy();
+	SeqTsHeader seqTs;
+	pcopy->RemoveHeader(seqTs);
+	stats->get(this->id).m_sentTimeBySeqClient[seqTs.GetSeq()] = Simulator::Now();
+
 }
 /* Jitter is calculated only for packet delivered in order
  * Dropped packets are ignored
@@ -557,6 +562,8 @@ void NodeEntry::OnCoapPacketReceived(Ptr<const Packet> packet, Address from) {
 		pCopy->RemoveHeader(seqTs);
 		// time from the moment server sends a reply until the moment client receives it
 		auto timeDiff = (Simulator::Now() - seqTs.GetTs());
+
+		stats->get(this->id).m_receivedTimeBySeqClient[seqTs.GetSeq()] = Simulator::Now();
 		//cout << "=========================CLIENT SEQ " << seqTs.GetSeq() << endl;
 		//if (seqTs.GetSeq() >= 0) //allways true
 		stats->get(this->id).NumberOfSuccessfulRoundtripPacketsWithSeqHeader++;

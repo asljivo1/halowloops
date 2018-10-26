@@ -759,9 +759,9 @@ EdcaTxopN::NotifyAccessGranted (void)
             {
               params.DisableRts ();
               NS_LOG_DEBUG ("tx unicast");
-              /*NS_LOG_DEBUG (" size=" << m_currentPacket->GetSize () <<
+              NS_LOG_DEBUG (" size=" << m_currentPacket->GetSize () <<
                                       ", to=" << m_currentHdr.GetAddr1 () <<
-                                      ", seq=" << m_currentHdr.GetSequenceControl ());*/
+                                      ", seq=" << m_currentHdr.GetSequenceControl ());
             }
           params.DisableNextData ();
           
@@ -1207,7 +1207,7 @@ void
 EdcaTxopN::OutsideRawStart (void)
 {
   NS_LOG_FUNCTION (this);
-  AccessAllowedIfRaw (true); // TODO this is different accross versions
+  AccessAllowedIfRaw (false); // TODO this is different accross versions, in this version it is true
   m_dcf-> OutsideRawStart ();
   m_stationManager->OutsideRawStart ();
   m_dcf->StartBackoffNow (m_dcf->GetBackoffSlots());

@@ -33,6 +33,8 @@ public:
     std::vector<Time> m_interPacketDelayServer;
     std::vector<Time> m_interPacketDelayClient;
     std::vector<Time> m_time;
+    map<uint32_t, Time> m_sentTimeBySeqClient;
+    map<uint32_t, Time> m_receivedTimeBySeqClient;
     long double GetInterPacketDelayDeviation(std::vector<Time>& delayVector);
     long double GetInterPacketDelayDeviationPercentage(std::vector<Time>& delayVector);
     Time GetAverageInterPacketDelay(std::vector<Time>& delayVector);
