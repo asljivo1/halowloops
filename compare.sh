@@ -4,9 +4,10 @@
 # 2. run this script
 
 targetdir="../../ahVisualizer/forwardsocketdata/simulations/compare/"
-rm ../../ahVisualizer/forwardsocketdata/simulations/compare/*
-cp nssfiles/* ../../ahVisualizer/forwardsocketdata/simulations/compare/
-cp nssfiles/* ../../ahVisualizer/forwardsocketdata/simulations/
+#uncomment this after the demo in leuven
+#rm ../../ahVisualizer/forwardsocketdata/simulations/compare/*
+#cp nssfiles/* ../../ahVisualizer/forwardsocketdata/simulations/compare/
+#cp nssfiles/* ../../ahVisualizer/forwardsocketdata/simulations/
 
 querystring=""
 
