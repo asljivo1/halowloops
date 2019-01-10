@@ -264,6 +264,9 @@ private:
   RPSVector m_rpsset;
   pageSlice m_pageslice;
   TIM m_TIM;
+  bool IsInCurrentTim (uint16_t aid) const;
+  uint16_t GetTimFromAid (uint16_t aid) const;
+
   void SetTotalStaNum (uint32_t num);
   uint32_t GetTotalStaNum (void) const;
   void SetupEdcaQueue (enum AcIndex ac, EdcaQueues& edcaqueues);
@@ -315,7 +318,7 @@ private:
   std::vector<Ptr<DcaTxop>> m_rawSlotsDca;
   std::vector<EdcaQueues> m_rawSlotsEdca;
 
-  std::vector<int> pendingDataSizeForStations;
+  //std::vector<int> pendingDataSizeForStations;
   std::vector<bool> staIsActiveDuringCurrentCycle;
 
   S1gRawCtr m_S1gRawCtr;
@@ -333,6 +336,9 @@ private:
   Time m_sharedSlotDuration;
   std::vector<std::vector<uint32_t> > m_loopAids;
   bool m_updateRps;
+
+  Time m_scheduleTransmissionForNextSlotIfLessThan;
+  bool m_alwaysScheduleForNextSlot;
 };
 
 } //namespace ns3
