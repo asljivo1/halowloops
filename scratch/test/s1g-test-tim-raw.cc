@@ -140,6 +140,7 @@ RPSVector configureRAW (RPSVector rpslist, string RAWConfigFile)
 	{
 		myfile >> NRPS;
 		int totalNumSta = 0;
+		uint16_t prevaidstart, prevaidend;
 		for (uint16_t kk = 0; kk < NRPS; kk++) // number of beacons covering all raw groups
 		{
 			RPS *m_rps = new RPS;
@@ -169,6 +170,7 @@ RPSVector configureRAW (RPSVector rpslist, string RAWConfigFile)
 				myfile >> aid_end;
 				rawinfo = (aid_end << 13) | (aid_start << 2) | page;
 				m_raw->SetRawGroup(rawinfo);
+
 				totalNumSta += aid_end - aid_start + 1;
 				m_rps->SetRawAssignment(*m_raw);
 				delete m_raw;
@@ -177,8 +179,7 @@ RPSVector configureRAW (RPSVector rpslist, string RAWConfigFile)
 			//config.nRawGroupsPerRpsList.push_back(NRAWPERBEACON);
 		}
 		myfile.close();
-		config.NRawSta = totalNumSta;
-				//rpslist.rpsset[rpslist.rpsset.size()-1]->GetRawAssigmentObj(NRAWPERBEACON-1).GetRawGroupAIDEnd();
+		config.NRawSta = rpslist.rpsset[rpslist.rpsset.size()-1]->GetRawAssigmentObj(NRAWPERBEACON-1).GetRawGroupAIDEnd();
 	}
 	else
 	{
@@ -1150,7 +1151,7 @@ void configureCoapServer() {
 	if (config.nControlLoops > 0)
 	{
 		CoapServerHelper clServer(5683);
-		clServer.SetAttribute("ProcessingDelay", TimeValue (MilliSeconds (10)));
+		clServer.SetAttribute("ProcessingDelay", TimeValue (MilliSeconds (1)));
 		for (int i = 0; i < config.nControlLoops; i++)
 		{
 			serverApp = clServer.Install(externalNodes.Get(i));
@@ -1199,7 +1200,7 @@ void configureCoapClients()
 				nodes[i]->m_nodeType = NodeEntry::DUMMY;
 
 				double random = m_rv->GetValue(0, config.trafficInterval);
-				clientApp.Start(MilliSeconds(0+random));
+				clientApp.Start(MilliSeconds(1+random));
 				clientApp.Stop(Seconds(config.simulationTime));
 
 
@@ -1537,12 +1538,12 @@ int main(int argc, char *argv[]) {
 	//LogComponentEnable ("UdpServer", LOG_LEVEL_INFO);
 	//LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
 	//LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
-	LogComponentEnable ("CoapClient", LOG_LEVEL_INFO);
-	LogComponentEnable ("CoapServer", LOG_LEVEL_INFO);
+	/*LogComponentEnable ("CoapClient", LOG_LEVEL_INFO);
+	LogComponentEnable ("CoapServer", LOG_LEVEL_INFO);*/
 
-	LogComponentEnable ("ApWifiMac", LOG_LEVEL_INFO);
+	/*LogComponentEnable ("ApWifiMac", LOG_LEVEL_INFO);
 	LogComponentEnable ("StaWifiMac", LOG_LEVEL_INFO);
-	LogComponentEnable ("EdcaTxopN", LOG_LEVEL_DEBUG);
+	LogComponentEnable ("EdcaTxopN", LOG_LEVEL_DEBUG);*/
 	//LogComponentEnable ("MacLow", LOG_LEVEL_DEBUG);
 
 	bool OutputPosition = true;
