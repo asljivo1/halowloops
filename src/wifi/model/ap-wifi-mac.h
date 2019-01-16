@@ -262,6 +262,7 @@ private:
   uint32_t GetSlotNumFromAid (uint16_t aid) const;
   uint32_t GetSlotNumFromRpsRawSlot (uint16_t rps, uint8_t rawg, uint8_t slot) const;
   RPSVector m_rpsset;
+  Time GetSlotDurationFromAid (uint16_t aid) const;
   pageSlice m_pageslice;
   TIM m_TIM;
   bool IsInCurrentTim (uint16_t aid) const;

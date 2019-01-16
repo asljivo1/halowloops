@@ -550,6 +550,7 @@ EdcaTxopN::NotifyAccessGranted (void)
   Time remainingRawTime = GetRawSlotDuration () - (Simulator::Now() - GetRawStartTime ());
   NS_LOG_DEBUG ("cross-slot boundary=" << GetCrossSlotBoundary () << ", slot duration=" << GetRawSlotDuration() << ", slot start time=" << GetRawStartTime() << ", now=" << Simulator::Now());
   NS_ASSERT (remainingRawTime >= 0);
+  //std::cout << "++++++AccessIfRaw=" << AccessIfRaw << ", mac=" << m_currentHdr.GetAddr2 () << std::endl;
   if (!AccessIfRaw)
     {
         return;
@@ -590,12 +591,27 @@ EdcaTxopN::NotifyAccessGranted (void)
           
           //while (1)
            // {
-              if (!(!m_sleepList.find(m_currentHdr.GetAddr1())->second || m_sleepList.size ()== 0)) // "m_sleepList.size ()== 0" for non-ap stations
+
+          if (GetRawSlotDuration() > 0)
+          {
+        	  //std::cout << "+++CORRECT SLOT" << std::endl;
+          }
+          else
+          {
+        	  //std::cout << "+++NOT CORRECT SLOT" << std::endl;
+        	  return;
+          }
+
+          /*    if (!(!m_sleepList.find(m_currentHdr.GetAddr1())->second || m_sleepList.size ()== 0)) // "m_sleepList.size ()== 0" for non-ap stations
               // no sleep 
                 {
+            	  std::cout << "+++IN SLEEP LIST" << std::endl;
             	  return;
                 }
-
+              else
+              {
+            	  std::cout << "+++AWAKE" << std::endl;
+              }*/
              //}
           m_currentPacket = m_queue->DequeueFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations);
           NS_ASSERT (m_currentPacket != 0);
@@ -1157,6 +1173,7 @@ void
 EdcaTxopN::StartAccessIfNeeded (void)
 {
   NS_LOG_FUNCTION (this);
+  //std::cout << "++++ EdcaTxopN::StartAccessIfNeeded,m_currentPacket == 0=" << (m_currentPacket == 0) << ",!m_queue->IsEmpty ()=" << !m_queue->IsEmpty () << ",m_baManager->HasPackets ()=" << m_baManager->HasPackets () << ",!m_dcf->IsAccessRequested ()=" << !m_dcf->IsAccessRequested () << ",AccessIfRaw=" << AccessIfRaw << std::endl;
   if (m_currentPacket == 0
       && (!m_queue->IsEmpty () || m_baManager->HasPackets ())
       && !m_dcf->IsAccessRequested ()
@@ -1165,6 +1182,7 @@ EdcaTxopN::StartAccessIfNeeded (void)
         int newdata=20;
         m_AccessQuest_record (Simulator::Now ().GetMicroSeconds (), newdata);
         m_manager->RequestAccess (m_dcf);
+        //std::cout << "++++ access requested" << std::endl;
     }
 }
 
@@ -1206,8 +1224,9 @@ EdcaTxopN::RawStart ()
 void
 EdcaTxopN::OutsideRawStart (void)
 {
+	//std::cout << "+++++EdcaTxopN::OutsideRawStart - AccessAllowedIfRaw (true)" << std::endl;
   NS_LOG_FUNCTION (this);
-  AccessAllowedIfRaw (false); // TODO this is different accross versions, in this version it is true
+  AccessAllowedIfRaw (true); // TODO this is different accross versions, in this version it is true
   m_dcf-> OutsideRawStart ();
   m_stationManager->OutsideRawStart ();
   m_dcf->StartBackoffNow (m_dcf->GetBackoffSlots());

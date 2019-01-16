@@ -501,6 +501,28 @@ uint32_t ApWifiMac::GetSlotNumFromRpsRawSlot(uint16_t rps, uint8_t rawg,
 			+ slot;
 }
 
+Time ApWifiMac::GetSlotDurationFromAid(uint16_t aid) const {
+	uint16_t raw_len =
+			(*m_rpsset.rpsset.at(GetTimFromAid(aid))).GetInformationFieldSize();
+
+	uint16_t rawAssignment_len = 6;
+	if (raw_len % rawAssignment_len != 0) {
+		NS_ASSERT("RAW configuration incorrect!");
+	}
+	uint8_t RAW_number = raw_len / rawAssignment_len;
+	for (uint8_t raw_index = 0; raw_index < RAW_number; raw_index++) {
+		RPS::RawAssignment ass =
+				m_rpsset.rpsset.at(GetTimFromAid(aid))->GetRawAssigmentObj(
+						raw_index);
+		if (ass.GetRawGroupAIDStart() <= aid
+				&& aid <= ass.GetRawGroupAIDEnd()) {
+			NS_LOG_DEBUG(
+					"[aid=" << aid << "] is located in RAW " << (int)raw_index + 1 << ". RAW slot duration = " << 500 + ass.GetSlotDurationCount() * 120 << " us.");
+			return MicroSeconds(500 + ass.GetSlotDurationCount() * 120);
+		}
+	}
+}
+
 Time ApWifiMac::GetSlotStartTimeFromAid(uint16_t aid) const {
 	//std::cout << "aid=" << (int)aid << ", toTim=" << (int)GetTimFromAid(aid) << std::endl;
 	uint16_t raw_len =
@@ -587,35 +609,66 @@ uint16_t ApWifiMac::GetTimFromAid(uint16_t aid) const {
 	}
 }
 
-void ApWifiMac::Enqueue(Ptr<const Packet> packet, Mac48Address to,
-		Mac48Address from) {
+void ApWifiMac::Enqueue(Ptr<const Packet> packet, Mac48Address to, Mac48Address from)
+{
 	NS_LOG_FUNCTION(this << packet << to << from);
-	if (to.IsBroadcast() || m_stationManager->IsAssociated(to)) {
-		bool schedulePacketForNextSlot = true;
+	if (to.IsBroadcast() || m_stationManager->IsAssociated(to))
+	{
+		/*bool schedulePacketForNextSlot = true;
 		Time timeRemaining = Time(0);
 		bool inSlot = false;
 
 		uint32_t aid = 0;
-		do {
+		do
+		{
 			aid++;
-		} while (m_AidToMacAddr.find(aid)->second != to); //TODO optimize search
+		}
+		while (m_AidToMacAddr.find(aid)->second != to); //TODO optimize search
 
 		//uint32_t timGroup = aid;
-		if (!m_alwaysScheduleForNextSlot
-				&& staIsActiveDuringCurrentCycle[aid - 1]) {
+		if (!m_alwaysScheduleForNextSlot && staIsActiveDuringCurrentCycle[aid - 1])
+		{
+			//std::cout << "sta aid=" << aid << " is active during current cycle." << std::endl;
 			// station is active in its respective slot until at least the next DTIM beacon is sent
 			// calculate if we are still inside the appropriate slot and transmit immediately if we are
 			// that way we can avoid having to wait an entire cycle until the next slot comes up
-			/*if (timGroup == m_currentBeaconTIMGroup)
-			 {
+			auto tim = this->GetTimFromAid(aid);
+			if (tim == this->m_DTIMCount)
+			{
+				// we're still in the correct TIM group, let's see if we're still inside the slot
+				Time currentOffsetSinceLastBeacon = (Simulator::Now() - this->m_lastBeaconTime);
+				std::cout << "-------last beacon time======= " << this->m_lastBeaconTime.GetMicroSeconds() << " us" << std::endl;
+				if (currentOffsetSinceLastBeacon >= this->GetSlotStartTimeFromAid(aid) + m_bufferTimeToAllowBeaconToBeReceived && currentOffsetSinceLastBeacon <= this->GetSlotStartTimeFromAid(aid) + this->GetSlotDurationFromAid(aid) + m_bufferTimeToAllowBeaconToBeReceived)
+				{
+					// still inside the slot too!, send packet immediately, if there is still enough time
+					timeRemaining = this->GetSlotStartTimeFromAid(aid) + this->GetSlotDurationFromAid(aid) + m_bufferTimeToAllowBeaconToBeReceived - currentOffsetSinceLastBeacon;
+					inSlot = true;
+					std::cout << "+++++++++++++TIME REMAINING======= "
+							<< timeRemaining.GetMicroSeconds() << "us, NOW="
+							<< Simulator::Now().GetMicroSeconds() << std::endl;
+					if (timeRemaining > m_scheduleTransmissionForNextSlotIfLessThan)
+					{
+						schedulePacketForNextSlot = false;
+						NS_LOG_DEBUG(Simulator::Now().GetMicroSeconds() << " Data for [" << aid << "] is transmitted immediately because AP can still get it out during the STA slot, in which the STA is actively listening, there's " << timeRemaining.GetMicroSeconds() << "µs remaining until slot is over");
+					}
+					else
+					{
+						//std::cout << "AP can't send the transmission directly, not enough time left (" << timeRemaining.GetMicroSeconds() << "µs while " << m_scheduleTransmissionForNextSlotIfLessThan.GetMicroSeconds() << " was required " << std::endl;
+					}
+				}
 
-			 }*/
+			}
 
-			std::cout << "++++++++++++++ GetTimFromAid(150)="
-					<< (int) GetTimFromAid(150) << std::endl;
 		}
+		m_packetToTransmitReceivedFromUpperLayer(packet, to, schedulePacketForNextSlot, inSlot, timeRemaining);
 
-		ForwardDown(packet, from, to);
+		if (schedulePacketForNextSlot)
+		{
+
+		}
+		*/
+			ForwardDown(packet, from, to);
+
 	}
 }
 
@@ -1246,14 +1299,14 @@ void ApWifiMac::SendOneBeacon(void) {
 		//NS_ASSERT (m_DTIMPeriod - m_DTIMCount + m_DTIMOffset == m_DTIMPeriod || (m_DTIMCount == 0 && m_DTIMOffset == 0));
 
 		//set sleep list, temporary, removed if ps-poll supported
-
+		/*
 		for (auto &it : m_rawSlotsEdca) {
 			it.find(AC_VO)->second->SetsleepList(m_sleepList);
 			it.find(AC_VI)->second->SetsleepList(m_sleepList);
 			it.find(AC_BE)->second->SetsleepList(m_sleepList);
 			it.find(AC_BK)->second->SetsleepList(m_sleepList);
 		}
-		/*m_edca.find (AC_VO)->second->SetsleepList (m_sleepList);
+		m_edca.find (AC_VO)->second->SetsleepList (m_sleepList);
 		 m_edca.find (AC_VI)->second->SetsleepList (m_sleepList);
 		 m_edca.find (AC_BE)->second->SetsleepList (m_sleepList);
 		 m_edca.find (AC_BK)->second->SetsleepList (m_sleepList);*/
