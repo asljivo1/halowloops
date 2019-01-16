@@ -670,6 +670,12 @@ void onChannelTransmission(Ptr<NetDevice> senderDevice, Ptr<Packet> packet) {
 		for (int i = rawGroup - 1; i >= 0; i--)
 			iSlot += config.rps.rpsset[rpsIndex]->GetRawAssigmentObj(i).GetSlotNum();
 
+	// to calculate the throughput of beacons
+	WifiMacHeader hdr;
+	packet->PeekHeader(hdr);
+	if (hdr.IsS1gBeacon())
+		stats.TotalBeaconsSizeInBytes += packet->GetSize();
+
 	if (rpsIndex >= 0 && rawGroup >= 0 && slotIndex >= 0)
 	{
 		if (senderDevice->GetAddress() == apDevice.Get(0)->GetAddress())
@@ -1303,6 +1309,8 @@ void printStatsToFile (bool print)
 			sTotalCollisions += stats.get(i).NumberOfCollisions;
 		}
 	}
+	os << "beaconsThorughput kbps=" << stats.TotalBeaconsSizeInBytes * 8 / stats.EndApplicationTime.GetSeconds() / 1000.0 << std::endl; //Kbps
+	std::cout << "beaconsThorughput kbps=" << stats.TotalBeaconsSizeInBytes * 8 / stats.EndApplicationTime.GetSeconds() / 1000.0 << std::endl;
 	//clTotalIpdClient = clTotalIpdClient / clTotalRtPackets;
 	//clTotalIpdServer = clTotalIpdServer / clTotalRtPackets;
 	double sensorThroughput = (sTotalDeliveredPackets + sTotalDuplicates) * config.payloadSize * 8 / (stats.EndApplicationTime.GetSeconds() - stats.TimeWhenEverySTAIsAssociated.GetSeconds()) / 1000.0;

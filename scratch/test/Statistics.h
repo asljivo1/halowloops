@@ -14,6 +14,7 @@ public:
     Time TotalSimulationTime;
     Time TimeWhenEverySTAIsAssociated;
     Time EndApplicationTime;
+    long TotalBeaconsSizeInBytes;
     
     Statistics();
     Statistics(int nrOfNodes);
