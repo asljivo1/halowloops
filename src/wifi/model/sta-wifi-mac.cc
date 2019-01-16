@@ -66,7 +66,7 @@ NS_LOG_COMPONENT_DEFINE ("StaWifiMac");
 
 NS_OBJECT_ENSURE_REGISTERED (StaWifiMac);
 uint32_t al = 1, ah= 1;
-std::vector<uint32_t> trackit {1};
+std::vector<uint32_t> trackit {};
 TypeId
 StaWifiMac::GetTypeId (void)
 {
@@ -779,11 +779,14 @@ StaWifiMac::SleepIfQueueIsEmpty(bool value)
 	   if(!HasPacketsInQueue() && !waitingack)
 
 	   {
-		   m_low->GetPhy()->SetSleepMode();
+		   /*m_low->GetPhy()->SetSleepMode();
 		   if (testtrackit)
 			   NS_LOG_DEBUG(
 					   "At " << Simulator::Now().GetSeconds() << " s AID " << this->GetAID(0) << " switches to SLEEP because it does not have packets in queue & it does not wait for ACK (SleepIfQueueIsEmpty).");
-
+*/
+		   if (testtrackit)
+		   			   NS_LOG_DEBUG(
+		   					   "At " << Simulator::Now().GetSeconds() << " s AID " << this->GetAID(0) << " DOES NOT switch to SLEEP even though it does not have packets in queue & it does not wait for ACK (SleepIfQueueIsEmpty), but it might get a response when AccessAllowedIfRaw (true) in EdcaTxopN::OutsideRawStart.");
 	   }
 
 	   if(HasPacketsInQueue() && !waitingack && !outsideraw && !stationrawslot)
@@ -1309,14 +1312,22 @@ StaWifiMac::Enqueue (Ptr<const Packet> packet, Mac48Address to)
 	{
 		WifiMacHeader header;
 		packet->PeekHeader(header);
-		NS_LOG_DEBUG (m_low->GetAddress () << ",enqueue," << Simulator::Now().GetSeconds() << "," << m_low->GetPhy()->IsStateSleep() << ",seq=" << header.GetSequenceNumber());
+		NS_LOG_DEBUG (m_low->GetAddress () << ",enqueue," << Simulator::Now().GetSeconds() << "," << m_low->GetPhy()->IsStateSleep());
 	}
 	//code RAW
-	if (m_low->GetPhy()->IsStateSleep() && stationrawslot)
+	if (stationrawslot)
 	{
-		if (testtrackit)
-			NS_LOG_DEBUG (m_low->GetAddress () << ",enqueue in stationrawslot," << Simulator::Now().GetSeconds());
-		WakeUp();
+		if (m_low->GetPhy()->IsStateSleep())
+		{
+			if (testtrackit)
+				NS_LOG_DEBUG (m_low->GetAddress () << ",enqueue in stationrawslot was sleeping," << Simulator::Now().GetSeconds());
+			WakeUp();
+		}
+		else
+		{
+			if (testtrackit)
+				NS_LOG_DEBUG (m_low->GetAddress () << ",enqueue in stationrawslot still awake," << Simulator::Now().GetSeconds());
+		}
 	}
 	if (m_low->GetPhy()->IsStateSleep() && outsideraw)
 	{
@@ -1386,6 +1397,7 @@ StaWifiMac::Enqueue (Ptr<const Packet> packet, Mac48Address to)
   params.DisableNextData();
   Time txTime = m_low->CalculateOverallTxTime(packet, &hdr, params);
   std::cout << "Sta aid=" << this->GetAID(0) << " TX time=" << txTime.GetMicroSeconds() << " us, " << packet->GetSize() << std::endl;*/
+  //std::cout << "m_qosSupported=" << m_qosSupported << std::endl;
   if (m_qosSupported)
     {
       //Sanity check that the TID is valid
@@ -1409,11 +1421,12 @@ StaWifiMac::S1gBeaconReceived (S1gBeaconHeader beacon)
         m_outsideRawEvent.Cancel ();          //avoid error when actual beacon interval become shorter, otherwise, AccessAllowedIfRaw will set again after raw starting
      }
 
+    //std::cout << "+++++StaWifiMac::S1gBeaconReceived, m_rawStart=" << m_rawStart << ",m_inRawGroup=" << m_inRawGroup << ",m_pagedStaRaw=" << m_pagedStaRaw << ",m_dataBuffered=" << m_dataBuffered << std::endl;
   if (!m_aids.size()) // send assoication request when Staion is not assoicated
     {
       m_dca->AccessAllowedIfRaw (true);
     }
-  else if (m_rawStart && m_inRawGroup && m_pagedStaRaw && m_dataBuffered ) // if m_pagedStaRaw is true, only m_dataBuffered can access channel
+  if (m_rawStart && m_inRawGroup && m_pagedStaRaw && m_dataBuffered ) // if m_pagedStaRaw is true, only m_dataBuffered can access channel
     {
       m_outsideRawEvent = Simulator::Schedule(m_lastRawDurationus, &StaWifiMac::OutsideRawStartBackoff, this);
       m_pspollDca->AccessAllowedIfRaw (true);
@@ -1433,7 +1446,10 @@ StaWifiMac::S1gBeaconReceived (S1gBeaconHeader beacon)
       m_edca.find (AC_VI)->second->AccessAllowedIfRaw (false);
       m_edca.find (AC_BE)->second->AccessAllowedIfRaw (false);
       m_edca.find (AC_BK)->second->AccessAllowedIfRaw (false);
-	  Simulator::Schedule(m_statSlotStart, &StaWifiMac::RawSlotStartBackoff, this);
+      for (auto const& nextSlotStart: m_statSlotStart)
+      {
+    	  Simulator::Schedule(nextSlotStart, &StaWifiMac::RawSlotStartBackoff, this);
+      }
     }
  else if (m_rawStart && !m_inRawGroup) //|| (m_rawStart && m_inRawGroup && m_pagedStaRaw && !m_dataBuffered)
     {
@@ -1600,6 +1616,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         }
         
         UnsetInRAWgroup ();
+        m_statSlotStart.clear();
         if (IsAssociated())
         {
         	uint8_t * rawassign;
@@ -1651,7 +1668,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
 
         			if ((ass.GetRawGroupAIDStart() <= (GetAID(0) & 0x03ff)) && ((GetAID(0) & 0x03ff) <= ass.GetRawGroupAIDEnd()))
         			{
-        				m_statSlotStart = MicroSeconds((500 + m_slotDurationCount * 120)*statRawSlot+m_currentRAW_start);//
+        				m_statSlotStart.push_back(MicroSeconds((500 + m_slotDurationCount * 120)*statRawSlot+m_currentRAW_start));//
         				//NS_LOG_DEBUG ("aid=" << GetAID(0) << ", ass.GetRawStart=" << (int)ass.GetRawStart() << ", m_statSlotStart=" << m_statSlotStart);
 
         				SetInRAWgroup ();
@@ -1693,12 +1710,15 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
     	*/
 
         Time sleept = Time();
-        if (m_statSlotStart > MicroSeconds (1))
-        	sleept = m_statSlotStart - MicroSeconds (1);
-        else
-        	sleept = m_statSlotStart;
-        //std::cout << "+++++++++++PAGEDDD SLEEP FOR " << sleept.GetMicroSeconds() << "us and then wake up" << timeBeacon << std::endl;
-        Simulator::Schedule(sleept, &StaWifiMac::WakeUp, this); //own slot
+        for (auto const& slotStartTime: m_statSlotStart)
+        {
+        	if (slotStartTime > MicroSeconds (1))
+        		sleept = slotStartTime - MicroSeconds (1);
+        	else
+        		sleept = slotStartTime;
+        	//std::cout << "+++++++++++PAGEDDD SLEEP FOR " << sleept.GetMicroSeconds() << "us and then wake up" << timeBeacon << std::endl;
+        	Simulator::Schedule(sleept, &StaWifiMac::WakeUp, this); //own slot
+        }
     	m_pagedInDtim = false;
     }
 
@@ -1761,7 +1781,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         	  else if (GetAids ().size() > 1)
         	  {
         		  //SetState(ASSOCIATED);
-        		  std::cout << "++++++++++++++++++++++++++ all my AIDs = " << ", now=" << Simulator::Now();
+        		  //std::cout << "++++++++++++++++++++++++++ all my AIDs = " << ", now=" << Simulator::Now();
         		  for (auto aid : GetAids())
         			  std::cout << "   " << aid;
         		  std::cout << std::endl;

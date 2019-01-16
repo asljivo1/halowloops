@@ -266,12 +266,13 @@ private:
   void GoToSleep(Time  sleeptime); 
   void SleepUntilMySlot ();
 
+  uint16_t m_numOfMySlots;
   Time m_lastRawDurationus;
   Time m_sharedSlotDuration;
   Time m_lastRawStart;
   Time m_rawDuration;
   Time m_slotDuration;
-  Time m_statSlotStart;
+  std::vector <Time> m_statSlotStart;
   bool m_rawStart;
   bool m_inRawGroup;
   bool m_pagedStaRaw;
