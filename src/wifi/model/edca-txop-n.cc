@@ -602,16 +602,16 @@ EdcaTxopN::NotifyAccessGranted (void)
         	  return;
           }
 
-          /*    if (!(!m_sleepList.find(m_currentHdr.GetAddr1())->second || m_sleepList.size ()== 0)) // "m_sleepList.size ()== 0" for non-ap stations
+              if (!(!m_sleepList.find(m_currentHdr.GetAddr1())->second || m_sleepList.size ()== 0)) // "m_sleepList.size ()== 0" for non-ap stations
               // no sleep 
                 {
-            	  std::cout << "+++IN SLEEP LIST" << std::endl;
+            	  //std::cout << "+++IN SLEEP LIST" << std::endl;
             	  return;
                 }
               else
               {
-            	  std::cout << "+++AWAKE" << std::endl;
-              }*/
+            	  //std::cout << "+++AWAKE" << std::endl;
+              }
              //}
           m_currentPacket = m_queue->DequeueFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations);
           NS_ASSERT (m_currentPacket != 0);

@@ -1299,14 +1299,14 @@ void ApWifiMac::SendOneBeacon(void) {
 		//NS_ASSERT (m_DTIMPeriod - m_DTIMCount + m_DTIMOffset == m_DTIMPeriod || (m_DTIMCount == 0 && m_DTIMOffset == 0));
 
 		//set sleep list, temporary, removed if ps-poll supported
-		/*
+
 		for (auto &it : m_rawSlotsEdca) {
 			it.find(AC_VO)->second->SetsleepList(m_sleepList);
 			it.find(AC_VI)->second->SetsleepList(m_sleepList);
 			it.find(AC_BE)->second->SetsleepList(m_sleepList);
 			it.find(AC_BK)->second->SetsleepList(m_sleepList);
 		}
-		m_edca.find (AC_VO)->second->SetsleepList (m_sleepList);
+		/*m_edca.find (AC_VO)->second->SetsleepList (m_sleepList);
 		 m_edca.find (AC_VI)->second->SetsleepList (m_sleepList);
 		 m_edca.find (AC_BE)->second->SetsleepList (m_sleepList);
 		 m_edca.find (AC_BK)->second->SetsleepList (m_sleepList);*/
