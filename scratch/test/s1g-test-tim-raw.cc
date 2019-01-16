@@ -141,6 +141,7 @@ RPSVector configureRAW (RPSVector rpslist, string RAWConfigFile)
 		myfile >> NRPS;
 		int totalNumSta = 0;
 		uint16_t prevaidstart, prevaidend;
+		uint16_t biggestAid = 0;
 		for (uint16_t kk = 0; kk < NRPS; kk++) // number of beacons covering all raw groups
 		{
 			RPS *m_rps = new RPS;
@@ -170,7 +171,8 @@ RPSVector configureRAW (RPSVector rpslist, string RAWConfigFile)
 				myfile >> aid_end;
 				rawinfo = (aid_end << 13) | (aid_start << 2) | page;
 				m_raw->SetRawGroup(rawinfo);
-
+				if (biggestAid < aid_end)
+					biggestAid = aid_end;
 				totalNumSta += aid_end - aid_start + 1;
 				m_rps->SetRawAssignment(*m_raw);
 				delete m_raw;
@@ -179,7 +181,7 @@ RPSVector configureRAW (RPSVector rpslist, string RAWConfigFile)
 			//config.nRawGroupsPerRpsList.push_back(NRAWPERBEACON);
 		}
 		myfile.close();
-		config.NRawSta = rpslist.rpsset[rpslist.rpsset.size()-1]->GetRawAssigmentObj(NRAWPERBEACON-1).GetRawGroupAIDEnd();
+		config.NRawSta = biggestAid;//rpslist.rpsset[rpslist.rpsset.size()-1]->GetRawAssigmentObj(NRAWPERBEACON-1).GetRawGroupAIDEnd();
 	}
 	else
 	{
