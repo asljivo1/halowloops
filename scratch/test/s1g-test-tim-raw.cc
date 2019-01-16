@@ -1247,8 +1247,8 @@ void configureCoapClients()
 void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 {
 	clientHelper.SetAttribute("MaxPackets", config.maxNumberOfPackets);
-	clientHelper.SetAttribute("Interval", TimeValue(MilliSeconds(config.cycleTime)));
-	clientHelper.SetAttribute("IntervalDeviation", TimeValue(MilliSeconds(0)));//MilliSeconds(config.cycleTime/10)
+	clientHelper.SetAttribute("Interval", TimeValue(MicroSeconds(config.cycleTime)));
+	clientHelper.SetAttribute("IntervalDeviation", TimeValue(MicroSeconds(0)));//MilliSeconds(config.cycleTime/10)
 	clientHelper.SetAttribute("PayloadSize", UintegerValue(config.payloadSize));
 	clientHelper.SetAttribute("RequestMethod", UintegerValue(3));
 	clientHelper.SetAttribute("MessageType", UintegerValue(0));
@@ -1260,7 +1260,7 @@ void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 	clientApp.Get(0)->TraceConnectWithoutContext("Tx", MakeCallback(&NodeEntry::OnCoapPacketSent, nodes[n]));
 	clientApp.Get(0)->TraceConnectWithoutContext("Rx", MakeCallback(&NodeEntry::OnCoapPacketReceived, nodes[n]));
 	double random = m_rv->GetValue(0, config.cycleTime);
-	clientApp.Start(MilliSeconds(0+random));
+	clientApp.Start(MicroSeconds(1000));//0+random
 	clientApp.Stop(Seconds(config.simulationTime));
 
 }
