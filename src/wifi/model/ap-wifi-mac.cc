@@ -917,7 +917,7 @@ uint8_t ApWifiMac::HasPacketsToSubBlock(uint16_t subblockInd, uint16_t blockInd,
 				m_AidToMacAddr.find(sta_aid)->second)) {
 			if (HasPacketsInQueueTo(m_AidToMacAddr.find(sta_aid)->second)) {
 				subblockBitmap = subblockBitmap | (1 << j);
-				m_sleepList[m_AidToMacAddr.find(sta_aid)->second] = false;
+				//m_sleepList[m_AidToMacAddr.find(sta_aid)->second] = false;
 			}
 		}
 	}
@@ -1142,7 +1142,7 @@ void ApWifiMac::SendOneBeacon(void) {
 
 			stasleepAddr = i->second;
 			if (m_stationManager->IsAssociated(stasleepAddr)) {
-				m_sleepList[stasleepAddr] = true;
+				//m_sleepList[stasleepAddr] = true;
 			}
 		}
 
@@ -1300,12 +1300,12 @@ void ApWifiMac::SendOneBeacon(void) {
 
 		//set sleep list, temporary, removed if ps-poll supported
 
-		for (auto &it : m_rawSlotsEdca) {
+		/*for (auto &it : m_rawSlotsEdca) {
 			it.find(AC_VO)->second->SetsleepList(m_sleepList);
 			it.find(AC_VI)->second->SetsleepList(m_sleepList);
 			it.find(AC_BE)->second->SetsleepList(m_sleepList);
 			it.find(AC_BK)->second->SetsleepList(m_sleepList);
-		}
+		}*/
 		/*m_edca.find (AC_VO)->second->SetsleepList (m_sleepList);
 		 m_edca.find (AC_VI)->second->SetsleepList (m_sleepList);
 		 m_edca.find (AC_BE)->second->SetsleepList (m_sleepList);
