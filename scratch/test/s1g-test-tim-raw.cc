@@ -1069,7 +1069,7 @@ void configureUDPClients() {
 	Ptr<UniformRandomVariable> m_rv = CreateObject<UniformRandomVariable>();
 
 	UdpClientHelper myClient(apNodeInterface.GetAddress(0), 9); //address of remote node
-	myClient.SetAttribute("MaxPackets", config.maxNumberOfPackets);
+	myClient.SetAttribute("MaxPackets", UintegerValue(config.maxNumberOfPackets));
 	myClient.SetAttribute("PacketSize", UintegerValue(config.payloadSize));
 	traffic_sta.clear();
 	ifstream trafficfile(config.TrafficPath);
@@ -1194,7 +1194,7 @@ void configureCoapClients()
 				// SENSORS sending uplink traffic to AP
 				//CoapClientHelper clientHelperDummy (externalInterfaces.GetAddress(0), 5683); //address of AP
 				CoapClientHelper clientHelperDummy (apNodeInterface.GetAddress(0), 5683);
-				clientHelperDummy.SetAttribute("MaxPackets", config.maxNumberOfPackets); //4294967295u
+				clientHelperDummy.SetAttribute("MaxPackets", UintegerValue(config.maxNumberOfPackets)); //4294967295u
 				clientHelperDummy.SetAttribute("Interval", TimeValue(MilliSeconds(config.trafficInterval)));
 				clientHelperDummy.SetAttribute("IntervalDeviation", TimeValue(MilliSeconds(config.trafficInterval/10)));
 				clientHelperDummy.SetAttribute("PayloadSize", UintegerValue(config.payloadSize));
@@ -1231,7 +1231,7 @@ void configureCoapClients()
 				// Dummy clients for network congestion send packets to some external service over AP
 				CoapClientHelper clientHelperDummy (externalInterfaces6.GetAddress(0, 0), 5683); //address of AP
 				//std::cout << " external node address is " << externalInterfaces.GetAddress(0) << std::endl;
-				clientHelperDummy.SetAttribute("MaxPackets", config.maxNumberOfPackets); //4294967295u
+				clientHelperDummy.SetAttribute("MaxPackets", UintegerValue(config.maxNumberOfPackets)); //4294967295u
 				clientHelperDummy.SetAttribute("Interval", TimeValue(MilliSeconds(config.trafficInterval)));
 				clientHelperDummy.SetAttribute("IntervalDeviation", TimeValue(MilliSeconds(config.trafficInterval/10)));
 				clientHelperDummy.SetAttribute("PayloadSize", UintegerValue(config.payloadSize));
@@ -1254,7 +1254,7 @@ void configureCoapClients()
 
 void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 {
-	clientHelper.SetAttribute("MaxPackets", config.maxNumberOfPackets);
+	clientHelper.SetAttribute("MaxPackets", UintegerValue(config.maxNumberOfPackets));
 	clientHelper.SetAttribute("Interval", TimeValue(MicroSeconds(config.cycleTime)));
 	clientHelper.SetAttribute("IntervalDeviation", TimeValue(MicroSeconds(0)));//MilliSeconds(config.cycleTime/10)
 	clientHelper.SetAttribute("PayloadSize", UintegerValue(config.payloadSize));
@@ -1268,7 +1268,7 @@ void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 	clientApp.Get(0)->TraceConnectWithoutContext("Tx", MakeCallback(&NodeEntry::OnCoapPacketSent, nodes[n]));
 	clientApp.Get(0)->TraceConnectWithoutContext("Rx", MakeCallback(&NodeEntry::OnCoapPacketReceived, nodes[n]));
 	double random = m_rv->GetValue(0, config.cycleTime);
-	clientApp.Start(MicroSeconds(1000));//0+random
+	clientApp.Start(MicroSeconds(1000));//0+random //37820 //33890
 	clientApp.Stop(Seconds(config.simulationTime));
 
 }
