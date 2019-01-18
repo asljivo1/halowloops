@@ -435,6 +435,7 @@ MgtAssocRequestHeader::Deserialize (Buffer::Iterator start)
     //NS_LOG_UNCOND ("assoc failed with sta55=");
   
   i = m_s1gCapability.DeserializeIfPresent (i);
+  i = m_aidRequest.DeserializeIfPresent(i);
     //NS_LOG_UNCOND ("assoc failed with sta66=");
 
   return i.GetDistanceFrom (start);

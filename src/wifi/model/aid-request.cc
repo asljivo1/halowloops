@@ -188,15 +188,21 @@ AidRequest::SerializeInformationField (Buffer::Iterator start) const
 	{
 		start.WriteU8 (m_AidRequestMode);
 		if (m_AidRequestMode & 0x0001)
+		{
 			start.WriteU16(this->m_AidRequestInterval);
+		}
 		if (m_AidRequestMode & 0x0002)
 		{
 			uint8_t buffer[6];
 			m_PeerStaAddress.CopyTo(buffer);
 			start.Write(buffer, 6);
+
 		}
-		if (m_AidRequestMode & 0x0002)
+		if (m_AidRequestMode & 0x0004)
+		{
 			start.WriteU8(static_cast<uint8_t> (this->m_ServiceCharacteristic));
+
+		}
 		if (m_AidRequestMode & 0x0020)
 		{
 			uint8_t buffer[6];
@@ -235,22 +241,28 @@ AidRequest::DeserializeInformationField (Buffer::Iterator start, uint8_t length)
 	//NS_LOG_UNCOND ("DeserializeInformationField length = " << length);
 	m_AidRequestMode = start.ReadU8 ();
 	if (m_AidRequestMode & 0x0001)
+	{
 		m_AidRequestInterval = start.ReadU16();
+	}
 	if (m_AidRequestMode & 0x0002)
 	{
 		uint8_t buffer[6];
 		start.Read(buffer, 6);
 		m_PeerStaAddress.CopyFrom(buffer);
+
 	}
-	if (m_AidRequestMode & 0x0002)
+	if (m_AidRequestMode & 0x0004)
+	{
+		uint8_t val = start.ReadU8();
 		this->SetServiceCharacteristic (static_cast<AidRequest::ServiceCharacteristic> (start.ReadU8()));
+	}
 	if (m_AidRequestMode & 0x0020)
 	{
 		uint8_t buffer[6];
 		start.Read(buffer, 6);
 		m_GroupAddress.CopyFrom(buffer);
 	}
-	/*NS_LOG_UNCOND ("AidRequest::DeserializeInformationField length = " << length << ", m_AidRequestMode=" << (int)m_AidRequestMode
+	/*NS_LOG_UNCOND ("AidRequest::DeserializeInformationField length = " << (int)length << ", m_AidRequestMode=" << (int)m_AidRequestMode
 			<< ", m_AidRequestInterval=" << (int)m_AidRequestInterval << ", m_PeerStaAddress=" << m_PeerStaAddress << ", m_ServiceCharacteristic=" << m_ServiceCharacteristic
 			<< ", m_GroupAddress=" << m_GroupAddress);*/
 	return length;
