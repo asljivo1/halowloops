@@ -38,6 +38,7 @@
 #include "amsdu-subframe-header.h"
 #include "mgt-headers.h"
 #include "ht-capabilities.h"
+#include "aid-request.h"
 
 #include "random-stream.h"
 
@@ -109,11 +110,12 @@ StaWifiMac::GetTypeId (void)
                    MakeUintegerAccessor (&StaWifiMac::GetChannelWidth,
                                          &StaWifiMac::SetChannelWidth),
                    MakeUintegerChecker<uint32_t> ())
-    .AddAttribute ("NumOfLoops",
-                   "Number of control loops.",
-                   UintegerValue (0),
-                   MakeUintegerAccessor (&StaWifiMac::m_numLoops),
-                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("ServiceCharacteristic",
+                   "Service Characteristic: 1=SENSOR, 2=OFFLOAD, 4=CRITICAL_SERVICE",
+                   UintegerValue (1),
+                   MakeUintegerAccessor (&StaWifiMac::GetServiceCharacteristic,
+                		   	   	   	   	 &StaWifiMac::SetServiceCharacteristic),
+                   MakeUintegerChecker<uint8_t> ())
     .AddAttribute ("ActiveProbing",
                    "If true, we send probe requests. If false, we don't."
                    "NOTE: if more than one STA in your simulation is using active probing, "
@@ -228,6 +230,19 @@ void
 StaWifiMac::SetChannelWidth (uint32_t width)
 {
    m_channelWidth = width;
+}
+
+void
+StaWifiMac::SetServiceCharacteristic (uint8_t value)
+{
+	NS_ASSERT (value == 1 || value == 2 || value == 4);
+	m_serviceCharacteristic = static_cast<AidRequest::ServiceCharacteristic> (value);
+}
+
+uint8_t
+StaWifiMac::GetServiceCharacteristic (void) const
+{
+	return m_serviceCharacteristic;
 }
 
 uint32_t
@@ -1098,6 +1113,10 @@ StaWifiMac::SendDisAssociationRequest (void)
         NS_LOG_DEBUG (GetAddress () << " StaWifiMac::SendDisAssociationRequest ");
 
     }
+    if (m_aidRequestSupported) //TODO not sure what here
+    {
+
+    }
 
     SetState (WAIT_DISASSOC_ACK);  // temporary used, should create another state
     //m_aid = 8192; //ensure disassociated station is not affected by Raw
@@ -1149,6 +1168,10 @@ if (assocVaule < fastAssocThreshold)
     {
         assoc.SetS1gCapabilities (GetS1gCapabilities ());
     }
+  if (m_aidRequestSupported)
+  {
+	  assoc.SetAidRequest (GetAidRequest());
+  }
 
   packet->AddHeader (assoc);
 
@@ -1773,7 +1796,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         	  AddAID(assocResp.GetAID());
         	  SetState (ASSOCIATED);
         	  if (testtrackit)
-        		  NS_LOG_DEBUG("[" << this->GetAddress() <<"] is associated and has AID = " << this->GetAID(0) << " at " << Simulator::Now());
+        		  NS_LOG_DEBUG("[" << this->GetAddress() <<"] is associated and has AID = " << this->GetAID(0) << ", service characteristic " << (int)this->GetServiceCharacteristic() << " at " << Simulator::Now());
 
         	  if (m_enabledVirtualAIDs && GetAID(0) == 1 && m_aids.size() == 1)
         		  Simulator::Schedule(Seconds(4), &StaWifiMac::SendAnotherAssociationRequest, this);
@@ -1800,6 +1823,10 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
                   NS_LOG_DEBUG (GetAddress () << ", receive " << uint16_t( s1gcapabilities.GetChannelWidth ()));
                   m_stationManager->AddStationS1gCapabilities (hdr->GetAddr2 (),s1gcapabilities);
                 }
+              if (m_aidRequestSupported) // TODO receive here aid response
+              {
+
+              }
 
               for (uint32_t i = 0; i < m_phy->GetNModes (); i++)
                 {
@@ -1901,6 +1928,15 @@ StaWifiMac::GetS1gCapabilities (void) const
   capabilities.SetChannelWidth (GetChannelWidth ());
   capabilities.SetPageSlicingSupport(1);
   return capabilities;
+}
+
+AidRequest
+StaWifiMac::GetAidRequest (void) const
+{
+	AidRequest aidreq;
+	aidreq.SetAidRequestSupported(1);
+	aidreq.SetServiceCharacteristic(static_cast<AidRequest::ServiceCharacteristic> (GetServiceCharacteristic ()));
+	return aidreq;
 }
 
 void

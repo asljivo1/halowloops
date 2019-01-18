@@ -31,6 +31,7 @@
 #include "s1g-capabilities.h"
 #include "ns3/traced-value.h"
 #include "extension-headers.h"
+#include "aid-request.h"
 
 namespace ns3  {
 
@@ -100,6 +101,8 @@ public:
     void SendDisAssociationRequest (void);
     void SendAssociationRequest (void);
 
+    void SetServiceCharacteristic (uint8_t value);
+    uint8_t GetServiceCharacteristic (void) const;
   /**
      * Get i-th Station's AID.
    */
@@ -219,6 +222,7 @@ private:
    */
   HtCapabilities GetHtCapabilities (void) const;
   S1gCapabilities GetS1gCapabilities (void) const;
+  AidRequest GetAidRequest (void) const;
   /**
    * Set the i-th AID where i starts from 0.
    *
@@ -348,8 +352,8 @@ private:
   TracedCallback<Mac48Address> m_assocLogger;
   TracedCallback<Mac48Address> m_deAssocLogger;
 
-  uint32_t m_numLoops;
   bool m_enabledVirtualAIDs;
+  uint8_t m_serviceCharacteristic;
 };
 
 } //namespace ns3
