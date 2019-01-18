@@ -46,7 +46,8 @@ S1gWifiMacHelper::Default (void)
   helper.SetType ("ns3::StaWifiMac",
                   "QosSupported", BooleanValue (true),
                   "HtSupported", BooleanValue (true),
-                  "S1gSupported", BooleanValue (true));
+                  "S1gSupported", BooleanValue (true),
+                  "AidRequestSupported", BooleanValue (true));
 
   return helper;
 }

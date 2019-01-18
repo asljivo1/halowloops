@@ -438,6 +438,7 @@ protected:
     */
   bool m_htSupported;
   bool m_s1gSupported;
+  bool m_aidRequestSupported;
  
   uint8_t m_s1gStaType;
   /**
@@ -465,7 +466,10 @@ protected:
    * \return true if S1G is supported, false otherwise
    */
   bool GetS1gSupported () const;
-    
+
+  void SetAidRequestSupported (bool enable);
+  bool GetAidRequestSupported (void) const;
+
   void SetS1gStaType (uint8_t type);
   uint8_t GetS1gStaType (void) const;
 

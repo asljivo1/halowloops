@@ -307,7 +307,20 @@ RegularWifiMac::GetS1gSupported () const
 {
   return m_s1gSupported;
 }
-    
+
+void
+RegularWifiMac::SetAidRequestSupported (bool enable)
+{
+  NS_LOG_FUNCTION (this);
+  m_aidRequestSupported = enable;
+}
+
+bool
+RegularWifiMac::GetAidRequestSupported () const
+{
+  return m_aidRequestSupported;
+}
+
 void
 RegularWifiMac::SetS1gStaType (uint8_t type)
 {
@@ -722,6 +735,14 @@ RegularWifiMac::GetTypeId (void)
                    MakeBooleanAccessor (&RegularWifiMac::SetS1gSupported,
                                         &RegularWifiMac::GetS1gSupported),
                    MakeBooleanChecker ())
+
+     .AddAttribute ("AidRequestSupported",
+                    "This Boolean attribute is set to enable Aid Request Support for 802.11ah STA",
+                    BooleanValue (false),
+                    MakeBooleanAccessor (&RegularWifiMac::SetAidRequestSupported,
+                                         &RegularWifiMac::GetAidRequestSupported),
+                    MakeBooleanChecker ())
+
     .AddAttribute ("S1gStaType",
                    "S1g STA type, for non-AP STA, 1 for sensor STA, 2 for non-sensor STA; for AP STA, 1 for sensor STA, 2 for non-sensor STA, 0 for both STA",
                    UintegerValue (1),
