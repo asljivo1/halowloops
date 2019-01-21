@@ -254,7 +254,7 @@ AidRequest::DeserializeInformationField (Buffer::Iterator start, uint8_t length)
 	if (m_AidRequestMode & 0x0004)
 	{
 		uint8_t val = start.ReadU8();
-		this->SetServiceCharacteristic (static_cast<AidRequest::ServiceCharacteristic> (start.ReadU8()));
+		this->SetServiceCharacteristic (static_cast<AidRequest::ServiceCharacteristic> (val));
 	}
 	if (m_AidRequestMode & 0x0020)
 	{
