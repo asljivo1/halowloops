@@ -1753,6 +1753,7 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 
 				}
 
+
 				if (problem) {
 					//One of the Basic Rate set mode is not
 					//supported by the station. So, we return an assoc
@@ -1792,6 +1793,13 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 								s1gcapabilities.GetPageSlicingSupport() != 0;
 						m_supportPageSlicingList[hdr->GetAddr2()] =
 								pageSlicingSupported;
+
+						if (m_aidRequestSupported)
+						{
+							AidRequest aidreq = assocReq.GetAidRequest();
+							std::cout << "-----aidreq.GetServiceCharacteristic()=" << (int)aidreq.GetServiceCharacteristic() << std::endl;
+						}
+
 						SendAssocResp(hdr->GetAddr2(), true, sta_type,
 								makeAdditionalAid);
 					} else {

@@ -32,6 +32,7 @@
 #include "ssid.h"
 #include "ht-capabilities.h"
 #include "s1g-capabilities.h"
+#include "aid-request.h"
 
 namespace ns3 {
 
@@ -59,18 +60,11 @@ public:
      */
     void SetSupportedRates (SupportedRates rates);
     /**
-     * Set the listen interval.
-     *
-     * \param interval the listen interval
-     */
-    void SetListenInterval (uint16_t interval);
-    /**
      * Set the HT capabilities.
      *
      * \param htcapabilities HT capabilities
      */
     void SetHtCapabilities (HtCapabilities htcapabilities);
-    
     /**
      * Return the HT capabilities.
      *
@@ -90,13 +84,6 @@ public:
      */
     SupportedRates GetSupportedRates (void) const;
     /**
-     * Return the listen interval.
-     *
-     * \return the listen interval
-     */
-    uint16_t GetListenInterval (void) const;
-    
-    /**
      * Register this type.
      * \return The TypeId.
      */
@@ -115,8 +102,8 @@ private:
     SupportedRates m_rates;             //!< List of supported rates
     CapabilityInformation m_capability; //!< Capability information
     HtCapabilities m_htCapability;      //!< HT capabilities
-    uint16_t m_listenInterval;
     S1gCapabilities m_s1gCapability;
+    AidRequest m_aidRequest;
     
     
 };
@@ -143,12 +130,6 @@ public:
    */
   void SetSupportedRates (SupportedRates rates);
   /**
-   * Set the listen interval.
-   *
-   * \param interval the listen interval
-   */
-  void SetListenInterval (uint16_t interval);
-  /**
    * Set the HT capabilities.
    *
    * \param htcapabilities HT capabilities
@@ -174,13 +155,6 @@ public:
    */
   SupportedRates GetSupportedRates (void) const;
   /**
-   * Return the listen interval.
-   *
-   * \return the listen interval
-   */
-  uint16_t GetListenInterval (void) const;
-
-  /**
    * Register this type.
    * \return The TypeId.
    */
@@ -194,15 +168,16 @@ public:
   void  SetS1gCapabilities (S1gCapabilities s1gcapabilities);
   S1gCapabilities  GetS1gCapabilities (void) const;
 
-
+  void  SetAidRequest (AidRequest aidRequest);
+  AidRequest  GetAidRequest (void) const;
 private:
   Ssid m_ssid;                        //!< Service Set ID (SSID)
   SupportedRates m_rates;             //!< List of supported rates
   CapabilityInformation m_capability; //!< Capability information
   HtCapabilities m_htCapability;      //!< HT capabilities
-  uint16_t m_listenInterval;
    
   S1gCapabilities m_s1gCapability;
+  AidRequest m_aidRequest;
 };
     
 

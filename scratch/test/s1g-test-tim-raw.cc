@@ -423,6 +423,21 @@ void configureNodes(NodeContainer& wifiStaNode, NetDeviceContainer& staDevice) {
 		n->SetDeassociatedCallback([ = ] {onSTADeassociated(i);});
 
 		nodes.push_back(n);
+
+		if (i < config.nControlLoops)
+		{
+		Config::Set(
+				"/NodeList/"+ std::to_string(i)
+		+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/ServiceCharacteristic",
+				UintegerValue(4));
+		}
+		else
+		{
+			Config::Set(
+					"/NodeList/"+ std::to_string(i)
+			+ "/DeviceList/0/$ns3::WifiNetDevice/Mac/$ns3::RegularWifiMac/$ns3::StaWifiMac/ServiceCharacteristic",
+			UintegerValue(1));
+		}
 		// hook up Associated and Deassociated events
 		Config::Connect(
 				"/NodeList/" + std::to_string(i)

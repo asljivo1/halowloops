@@ -303,7 +303,6 @@ MgtBeaconHeader::GetTypeId (void)
 NS_OBJECT_ENSURE_REGISTERED (MgtAssocRequestHeader);
 
 MgtAssocRequestHeader::MgtAssocRequestHeader ()
-  : m_listenInterval (0)
 {
 }
 
@@ -336,9 +335,15 @@ MgtAssocRequestHeader::SetS1gCapabilities (S1gCapabilities s1gcapabilities)
 }
 
 void
-MgtAssocRequestHeader::SetListenInterval (uint16_t interval)
+MgtAssocRequestHeader::SetAidRequest (AidRequest aidRequest)
 {
-  m_listenInterval = interval;
+	m_aidRequest = aidRequest;
+}
+
+AidRequest
+MgtAssocRequestHeader::GetAidRequest (void) const
+{
+	return m_aidRequest;
 }
 
 HtCapabilities
@@ -363,12 +368,6 @@ SupportedRates
 MgtAssocRequestHeader::GetSupportedRates (void) const
 {
   return m_rates;
-}
-
-uint16_t
-MgtAssocRequestHeader::GetListenInterval (void) const
-{
-  return m_listenInterval;
 }
 
 TypeId
@@ -399,6 +398,7 @@ MgtAssocRequestHeader::GetSerializedSize (void) const
   size += m_htCapability.GetSerializedSize ();
   size += m_s1gCapability.GetSerializedSize ();
   size += m_rates.extended.GetSerializedSize ();
+  size += m_aidRequest.GetSerializedSize();
   return size;
 }
 
@@ -415,12 +415,12 @@ MgtAssocRequestHeader::Serialize (Buffer::Iterator start) const
 {
   Buffer::Iterator i = start;
   i = m_capability.Serialize (i);
-  i.WriteHtolsbU16 (m_listenInterval);
   i = m_ssid.Serialize (i);
   i = m_rates.Serialize (i);
   i = m_rates.extended.Serialize (i);
   i = m_htCapability.Serialize (i);
   i = m_s1gCapability.Serialize (i);
+  i = m_aidRequest.Serialize(i);
 }
 
 uint32_t
@@ -428,7 +428,6 @@ MgtAssocRequestHeader::Deserialize (Buffer::Iterator start)
 {
   Buffer::Iterator i = start;
   i = m_capability.Deserialize (i);
-  m_listenInterval = i.ReadLsbtohU16 ();
   i = m_ssid.Deserialize (i);
   i = m_rates.Deserialize (i);
   i = m_rates.extended.DeserializeIfPresent (i);
@@ -436,6 +435,7 @@ MgtAssocRequestHeader::Deserialize (Buffer::Iterator start)
     //NS_LOG_UNCOND ("assoc failed with sta55=");
   
   i = m_s1gCapability.DeserializeIfPresent (i);
+  i = m_aidRequest.DeserializeIfPresent(i);
     //NS_LOG_UNCOND ("assoc failed with sta66=");
 
   return i.GetDistanceFrom (start);
@@ -448,7 +448,6 @@ MgtAssocRequestHeader::Deserialize (Buffer::Iterator start)
 NS_OBJECT_ENSURE_REGISTERED (MgtDisAssocRequestHeader);
 
 MgtDisAssocRequestHeader::MgtDisAssocRequestHeader ()
-: m_listenInterval (0)
 {
 }
 
@@ -480,12 +479,6 @@ MgtDisAssocRequestHeader::SetS1gCapabilities (S1gCapabilities s1gcapabilities)
     m_s1gCapability = s1gcapabilities;
 }
 
-void
-MgtDisAssocRequestHeader::SetListenInterval (uint16_t interval)
-{
-    m_listenInterval = interval;
-}
-
 HtCapabilities
 MgtDisAssocRequestHeader::GetHtCapabilities (void) const
 {
@@ -508,12 +501,6 @@ SupportedRates
 MgtDisAssocRequestHeader::GetSupportedRates (void) const
 {
     return m_rates;
-}
-
-uint16_t
-MgtDisAssocRequestHeader::GetListenInterval (void) const
-{
-    return m_listenInterval;
 }
 
 TypeId
@@ -560,7 +547,6 @@ MgtDisAssocRequestHeader::Serialize (Buffer::Iterator start) const
 {
     Buffer::Iterator i = start;
     i = m_capability.Serialize (i);
-    i.WriteHtolsbU16 (m_listenInterval);
     i = m_ssid.Serialize (i);
     i = m_rates.Serialize (i);
     i = m_rates.extended.Serialize (i);
@@ -573,7 +559,6 @@ MgtDisAssocRequestHeader::Deserialize (Buffer::Iterator start)
 {
     Buffer::Iterator i = start;
     i = m_capability.Deserialize (i);
-    m_listenInterval = i.ReadLsbtohU16 ();
     i = m_ssid.Deserialize (i);
     i = m_rates.Deserialize (i);
     i = m_rates.extended.DeserializeIfPresent (i);
