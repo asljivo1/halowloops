@@ -67,7 +67,7 @@ NS_LOG_COMPONENT_DEFINE ("StaWifiMac");
 
 NS_OBJECT_ENSURE_REGISTERED (StaWifiMac);
 uint32_t al = 1, ah= 1;
-std::vector<uint32_t> trackit {1};
+std::vector<uint32_t> trackit {1,2};
 TypeId
 StaWifiMac::GetTypeId (void)
 {
@@ -972,6 +972,8 @@ StaWifiMac::StartRawbackoff (void)
 void
 StaWifiMac::OutsideRawStartBackoff (void)
 {
+	if (this->GetAidRequest().GetServiceCharacteristic() == AidRequest::CRITICAL_SERVICE)
+		return;
    if (m_insideBackoffEvent.IsRunning ())
      {
        m_insideBackoffEvent.Cancel ();

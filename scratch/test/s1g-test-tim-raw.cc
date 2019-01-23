@@ -1283,7 +1283,7 @@ void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 	clientApp.Get(0)->TraceConnectWithoutContext("Tx", MakeCallback(&NodeEntry::OnCoapPacketSent, nodes[n]));
 	clientApp.Get(0)->TraceConnectWithoutContext("Rx", MakeCallback(&NodeEntry::OnCoapPacketReceived, nodes[n]));
 	double random = m_rv->GetValue(0, config.cycleTime);
-	clientApp.Start(MicroSeconds(1000));//0+random //37820 //33890
+	clientApp.Start(MicroSeconds(0+random));//0+random //37820 //33890
 	clientApp.Stop(Seconds(config.simulationTime));
 
 }

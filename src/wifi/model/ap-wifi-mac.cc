@@ -1797,7 +1797,7 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 						if (m_aidRequestSupported)
 						{
 							AidRequest aidreq = assocReq.GetAidRequest();
-							std::cout << "-----aidreq.GetServiceCharacteristic()=" << (int)aidreq.GetServiceCharacteristic() << std::endl;
+							//std::cout << "-----aidreq.GetServiceCharacteristic()=" << (int)aidreq.GetServiceCharacteristic() << std::endl;
 						}
 
 						SendAssocResp(hdr->GetAddr2(), true, sta_type,
