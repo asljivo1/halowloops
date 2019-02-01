@@ -67,7 +67,7 @@ NS_LOG_COMPONENT_DEFINE ("StaWifiMac");
 
 NS_OBJECT_ENSURE_REGISTERED (StaWifiMac);
 uint32_t al = 1, ah= 1;
-std::vector<uint32_t> trackit {1,2};
+std::vector<uint32_t> trackit {1,2,3,4,5};
 TypeId
 StaWifiMac::GetTypeId (void)
 {
@@ -791,17 +791,17 @@ StaWifiMac::SleepIfQueueIsEmpty(bool value)
    waitingack = !value;
    if (IsAssociated() && !receivingBeacon)
    {
-	   if(!HasPacketsInQueue() && !waitingack)
+	   if(!HasPacketsInQueue() && !waitingack && !m_dataBuffered)
 
 	   {
-		   /*m_low->GetPhy()->SetSleepMode();
+		   m_low->GetPhy()->SetSleepMode();
 		   if (testtrackit)
 			   NS_LOG_DEBUG(
-					   "At " << Simulator::Now().GetSeconds() << " s AID " << this->GetAID(0) << " switches to SLEEP because it does not have packets in queue & it does not wait for ACK (SleepIfQueueIsEmpty).");
-*/
-		   if (testtrackit)
+					   "At " << Simulator::Now().GetSeconds() << " s AID " << this->GetAID(0) << " switches to SLEEP because it does not have packets in queue & it does not wait for ACK (SleepIfQueueIsEmpty) & it does not have DL data pending.");
+
+		   /*if (testtrackit)
 		   			   NS_LOG_DEBUG(
-		   					   "At " << Simulator::Now().GetSeconds() << " s AID " << this->GetAID(0) << " DOES NOT switch to SLEEP even though it does not have packets in queue & it does not wait for ACK (SleepIfQueueIsEmpty), but it might get a response when AccessAllowedIfRaw (true) in EdcaTxopN::OutsideRawStart.");
+		   					   "At " << Simulator::Now().GetSeconds() << " s AID " << this->GetAID(0) << " DOES NOT switch to SLEEP even though it does not have packets in queue & it does not wait for ACK (SleepIfQueueIsEmpty), but it might get a response when AccessAllowedIfRaw (true) in EdcaTxopN::OutsideRawStart.");*/
 	   }
 
 	   if(HasPacketsInQueue() && !waitingack && !outsideraw && !stationrawslot)
@@ -1533,7 +1533,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         {
     	  if (testtrackit)
     	  NS_LOG_DEBUG (GetAddress () << " received qos data from " << hdr->GetAddr3 () << " @ " << Simulator::Now().GetMicroSeconds());
-
+    	  //this->ClearDataBuffered();
     	  if (hdr->IsQosAmsdu ())
             {
               NS_ASSERT (hdr->GetAddr3 () == GetBssid ());

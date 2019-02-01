@@ -1517,8 +1517,9 @@ MacLow::CalculateOverallTxTime (Ptr<const Packet> packet,
   txTime += m_phy->CalculateTxDuration (dataSize, dataTxVector, preamble, m_phy->GetFrequency (), 0, 0);
   if (params.MustWaitAck ())
     {
+      //NS_LOG_UNCOND("Packet to " << hdr->GetAddr1 () << "TX_time_init=" << txTime << ", sifs=" << GetSifs () << ", ACK=" << GetAckDuration (hdr->GetAddr1 (), dataTxVector));
       txTime += GetSifs ();
-      txTime += GetAckDuration (hdr->GetAddr1 (), dataTxVector);
+      txTime += GetAckDuration (hdr->GetAddr1 (), dataTxVector);//to
     }
   return txTime;
 }

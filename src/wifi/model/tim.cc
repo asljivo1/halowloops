@@ -198,6 +198,7 @@ TIM::SetPageIndex (uint8_t control)
 void
 TIM::SetPartialVBitmap (TIM::EncodedBlock block)
 {
+	//NS_LOG_UNCOND(">> call SetPartialVBitma(Encoded block) m_length=" << (int)m_length);
   m_encodeblock = block;
   uint8_t offset = m_encodeblock.GetBlockOffset ();
   uint8_t control = m_encodeblock.GetBlockControl ();
@@ -208,14 +209,17 @@ TIM::SetPartialVBitmap (TIM::EncodedBlock block)
   
   m_partialVBitmap_arrary[m_length] = m_encodeblock.GetBlockBitmap ();
   m_length++;
+  //NS_LOG_UNCOND("+++GetBlockBitmap=" << (int)m_encodeblock.GetBlockBitmap ());
   NS_LOG_DEBUG ("Block Bitmap = " << (int)m_encodeblock.GetBlockBitmap ());
 
   subblock = m_encodeblock.GetSubblock ();
   uint8_t len = m_encodeblock.GetSize ();  //size of EncodedBlock
+  //NS_LOG_UNCOND("+++++size of encoded block=" << (int)len);
+
   uint8_t i=0;
   while (i < len-2) //blockcotrol, blockoffset has already been added into m_partialVBitmap
   {
-	NS_LOG_DEBUG ("Subblock " << (int)i << " = " << (int)(*subblock));
+	//NS_LOG_UNCOND ("Subblock " << (int)i << " = " << (int)(*subblock));
 
     m_partialVBitmap_arrary[m_length] = *subblock;
     m_length++;

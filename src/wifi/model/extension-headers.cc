@@ -209,8 +209,12 @@ S1gBeaconHeader::GetSerializedSize (void) const
   size += m_tim.GetSerializedSize ();
   size += m_rps.GetSerializedSize ();
   if (!m_tim.GetDTIMCount())
+  {
 	  size += m_pageSlice.GetSerializedSize ();
+  //NS_LOG_UNCOND ("BEACON+ m_pageSlice=" << m_pageSlice.GetSerializedSize ());
+  }
   size += m_auth.GetSerializedSize ();
+  //NS_LOG_UNCOND ("BEACON: m_beaconcompatibility=" << m_beaconcompatibility.GetSerializedSize () << ", m_tim=" << m_tim.GetSerializedSize () << ", m_rps=" << m_rps.GetSerializedSize() << ", m_auth=" << m_auth.GetSerializedSize());
   
   return size;
 }
