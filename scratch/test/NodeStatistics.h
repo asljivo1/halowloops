@@ -132,6 +132,11 @@ public:
     double getIPCameraSendingRate();
     double getIPCameraAPReceivingRate();
 
+    std::map<uint64_t, Time> txBeginTimeMap;
+    std::map<uint64_t, Time> rxBeginTimeMap;
+
+    std::map<uint64_t, Time> txEndTimeMap;
+    std::map<uint64_t, Time> rxEndTimeMap;
 };
 
 #endif /* NODESTATISTICS_H */

@@ -80,7 +80,7 @@ struct Configuration {
 	/*
 	 * Le's config params
 	 * */
-	uint32_t payloadSize = 100;
+	uint32_t payloadSize = 200;
 	string folder="./scratch/";
 	string file="./scratch/mac-sta.txt";
 	string TrafficPath="./OptimalRawGroup/traffic/data-32-0.82.txt";
