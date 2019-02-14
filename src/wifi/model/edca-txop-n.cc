@@ -1182,7 +1182,7 @@ EdcaTxopN::StartAccessIfNeeded (void)
         int newdata=20;
         m_AccessQuest_record (Simulator::Now ().GetMicroSeconds (), newdata);
         m_manager->RequestAccess (m_dcf);
-        //std::cout << "++++ access requested" << std::endl;
+        //std::cout << "++++ access requested AccessIfRaw=" << (int)AccessIfRaw << std::endl;
     }
 }
 
@@ -1226,7 +1226,7 @@ EdcaTxopN::OutsideRawStart (void)
 {
 	//std::cout << "+++++EdcaTxopN::OutsideRawStart - AccessAllowedIfRaw (true)" << std::endl;
   NS_LOG_FUNCTION (this);
-  AccessAllowedIfRaw (true); // TODO this is different accross versions, in this version it is true
+  AccessAllowedIfRaw (false); // TODO this is different accross versions, in this version it is true
   m_dcf-> OutsideRawStart ();
   m_stationManager->OutsideRawStart ();
   m_dcf->StartBackoffNow (m_dcf->GetBackoffSlots());
