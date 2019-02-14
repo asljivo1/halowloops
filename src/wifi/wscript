@@ -172,6 +172,7 @@ def build(bld):
         'model/pageSlice.h',
         'model/s1g-raw-control.h',
         'model/s1g-capabilities.h',
+	'model/aid-request.h',
         'model/aid-response.h',
         'model/authentication-control.h',
         'model/drop-reason.h',
