@@ -67,7 +67,7 @@ NS_LOG_COMPONENT_DEFINE ("StaWifiMac");
 
 NS_OBJECT_ENSURE_REGISTERED (StaWifiMac);
 uint32_t al = 1, ah= 1;
-std::vector<uint32_t> trackit {1,2};
+std::vector<uint32_t> trackit {1};
 TypeId
 StaWifiMac::GetTypeId (void)
 {

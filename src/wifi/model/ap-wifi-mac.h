@@ -142,7 +142,8 @@ public:
   uint8_t HasPacketsToBlock (uint16_t blockInd , uint16_t PageInd);
   uint32_t HasPacketsToPage (uint8_t blockstart , uint8_t Page);
 
-
+  bool IsPagedInDtim (uint32_t aid);
+  bool IsPagedInTim (uint32_t aid);
 
 
 private:
@@ -259,7 +260,8 @@ private:
   Time GetSlotStartTimeFromAid (uint16_t aid) const;
   void SetPageSlicingActivated (bool activate);
   bool GetPageSlicingActivated (void) const;
-  uint32_t GetSlotNumFromAid (uint16_t aid) const;
+  uint32_t GetNextSlotNumFromAid (uint16_t aid) const;
+  std::vector<uint32_t> GetAllSlotNumbersFromAid(uint16_t aid) const;
   uint32_t GetSlotNumFromRpsRawSlot (uint16_t rps, uint8_t rawg, uint8_t slot) const;
   RPSVector m_rpsset;
   Time GetSlotDurationFromAid (uint16_t aid) const;

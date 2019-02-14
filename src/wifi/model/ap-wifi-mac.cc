@@ -429,20 +429,126 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 	if (m_qosSupported) {
 		//Sanity check that the TID is valid
 		NS_ASSERT(tid < 8);
-		uint32_t targetSlot = GetSlotNumFromAid(aid);
+		uint32_t targetSlot = GetNextSlotNumFromAid(aid);
 		//std::cout << ">>AP enqueues to dst aid=" << (int)aid << "targetSlot=" << targetSlot << std::endl;
 		//m_rawSlotsEdca[GetSlotNumFromAid (aid)].find(QosUtilsMapTidToAc (tid))->second->Queue(packet, hdr);
-		m_rawSlotsEdca[targetSlot][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
+
+		// if paged both in DTIM and in TIM enqueue immediately
+		//if (IsPagedInDtim (aid))
+		if (IsPagedInDtim (aid))
+		{
+			//NS_LOG_UNCOND("++++++++++++++++++ aid=" << aid << " PAGED");
+			m_rawSlotsEdca[targetSlot][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
+		}
+		else
+		{
+
+			if (targetSlot > GetAllSlotNumbersFromAid(aid)[0])
+				m_rawSlotsEdca[GetAllSlotNumbersFromAid(aid)[0]][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
+			else
+				NS_LOG_UNCOND("NOT IMPLEMENTED CASE in ApWifiMac::ForwardDown. Delay for the next beacon interval because AID is not paged in the current one.");
+
+			//NS_LOG_UNCOND("++++++++++++++++++ aid=" << aid << " NOT PAGED");
+		}
+		//else enqueue after it is paged (next DTIM)
+
 		//m_edca[QosUtilsMapTidToAc (tid)]->Queue (packet, hdr);
 	} else {
 		// queue the packet in the specific raw slot period DCA
-		m_rawSlotsDca[GetSlotNumFromAid(aid)]->Queue(packet, hdr);
+		m_rawSlotsDca[GetNextSlotNumFromAid(aid)]->Queue(packet, hdr);
 		//m_dca->Queue (packet, hdr);
 	}
 
 }
 
-uint32_t ApWifiMac::GetSlotNumFromAid(uint16_t aid) const {
+bool
+ApWifiMac::IsPagedInDtim (uint32_t aid)
+{
+	NS_LOG_UNCOND("+++++++++++++++++++++++GetPageBitmapLength=" << (int)m_pageslice.GetPageBitmapLength());
+	if (!m_pageslice.GetPageBitmapLength())
+		return false;
+
+	uint32_t aid_block = (aid >> 6) & 0x1f;
+	uint32_t aid_page = aid >> 11;
+
+	if (aid_page != m_pageslice.GetPageindex())
+		return false;
+
+	if (aid_block < m_pageslice.GetBlockOffset())
+		return false;
+
+	uint8_t Ind, offset;
+	bool paged;
+	Ind = aid_block / 8;
+	offset = aid_block % 8;
+	paged = m_pageslice.GetPageBitmap()[Ind] & (1 << offset);
+	return paged;
+}
+
+bool ApWifiMac::IsPagedInTim (uint32_t aid)
+{
+	uint32_t aid_block = (aid >> 6) & 0x1f;
+	uint32_t aid_subblock = (aid >> 3) & 0x07;
+	uint32_t aid_page = aid >> 11;
+	uint32_t aid_PageSliceNumber = (aid_block - m_pageslice.GetBlockOffset()) / m_pageslice.GetPageSliceLen();
+
+	uint8_t * partialVBitmap = m_TIM.GetPartialVBitmap();
+	if(m_TIM.GetInformationFieldSize() < 5)
+		return false;
+
+	uint8_t pos = 0;
+	do
+	{
+		uint8_t blockind = ((*partialVBitmap) >> 3) & 0x1f;
+		partialVBitmap++;
+		pos++;
+		uint8_t blockbitmap = *partialVBitmap;
+
+		if (blockind == aid_block)
+		{
+			if ((blockbitmap & (1 << aid_subblock)) == 0) //no packets in subblock
+			{
+				return false;
+			}
+			else
+			{
+				for (uint8_t j = 0; j <= aid_subblock; j++)
+				{
+					if ((blockbitmap & (0x01 << j)))//==1 is incorrect because sometimes it can be 0000 0010 e.g. 2
+					{
+						partialVBitmap++;
+						pos++;
+					}
+				}
+				uint8_t subblockind = *partialVBitmap;
+				if ((subblockind & (1 << (aid & 0x0007))) == 0) //no packet for me
+				{
+					return false;
+				}
+				else
+				{
+					return true;
+				}
+			}
+		}
+		else
+		{
+			for (uint8_t k = 0; k <= 7; k++)
+			{
+				if ((blockbitmap & (1 << k)) == 1)
+				{
+					partialVBitmap++;
+					pos++;
+				}
+			}
+		}
+	}
+	while (pos < m_TIM.GetInformationFieldSize() - 3);
+}
+
+std::vector<uint32_t>
+ApWifiMac::GetAllSlotNumbersFromAid (uint16_t aid) const
+{
 	NS_ASSERT(aid > 0 && aid < 8192);
 	uint32_t numTim = 0;
 	if (m_pageslice.GetPageSliceCount() == 0)
@@ -451,27 +557,93 @@ uint32_t ApWifiMac::GetSlotNumFromAid(uint16_t aid) const {
 		numTim = m_pageslice.GetPageSliceCount();
 
 	uint32_t myslot = 0;
-	bool found = false;
-	for (uint32_t i = 0; i < numTim; i++) {
+	std::vector <uint32_t> myslotsVector;
+	//bool found = false;
+
+
+	for (uint32_t i = 0; i < numTim; i++)
+	{
 		//std::cout << "i=" << i << " has numRawGrups=" << (int)m_rpsset.rpsset.at(i)->GetNumberOfRawGroups() << std::endl;
-		for (uint32_t j = 0; j < m_rpsset.rpsset.at(i)->GetNumberOfRawGroups();
-				j++) {
-			RPS::RawAssignment ass = m_rpsset.rpsset.at(i)->GetRawAssigmentObj(
-					j);
+		for (uint32_t j = 0; j < m_rpsset.rpsset.at(i)->GetNumberOfRawGroups();	j++)
+		{
+			RPS::RawAssignment ass = m_rpsset.rpsset.at(i)->GetRawAssigmentObj(j);
+			//std::cout << "    j="<<j<< ", aidStart=" <<(int)ass.GetRawGroupAIDStart() << ", aidEnd=" << (int)ass.GetRawGroupAIDEnd() <<std::endl;
+
+			if (ass.GetRawGroupAIDStart() <= aid && aid <= ass.GetRawGroupAIDEnd()) {
+				myslot += aid % ass.GetSlotNum();
+				myslotsVector.push_back(myslot);
+				myslot += ass.GetSlotNum();
+				myslot -= aid % ass.GetSlotNum();
+
+				//found = true;
+				//break;
+			} else
+				myslot += ass.GetSlotNum();
+		}
+	}
+	/*std::cout << "\n aid=" << (int)aid << ", slots=";
+	for (auto slotnum : myslotsVector)
+		std::cout <<slotnum << ", ";
+	std::cout << std::endl;*/
+	return myslotsVector;
+}
+
+uint32_t ApWifiMac::GetNextSlotNumFromAid(uint16_t aid) const {
+	NS_ASSERT(aid > 0 && aid < 8192);
+	uint32_t numTim = 0;
+	if (m_pageslice.GetPageSliceCount() == 0)
+		numTim = 1;
+	else
+		numTim = m_pageslice.GetPageSliceCount();
+
+	uint32_t myslot = 0;
+	std::vector <uint32_t> myslotsVector;
+	//bool found = false;
+
+
+	for (uint32_t i = 0; i < numTim; i++)
+	{
+		//std::cout << "i=" << i << " has numRawGrups=" << (int)m_rpsset.rpsset.at(i)->GetNumberOfRawGroups() << std::endl;
+		for (uint32_t j = 0; j < m_rpsset.rpsset.at(i)->GetNumberOfRawGroups();	j++)
+		{
+			RPS::RawAssignment ass = m_rpsset.rpsset.at(i)->GetRawAssigmentObj(j);
 			//std::cout << "    j="<<j<< ", aidStart=" <<(int)ass.GetRawGroupAIDStart() << ", aidEnd=" << (int)ass.GetRawGroupAIDEnd() <<std::endl;
 
 			if (ass.GetRawGroupAIDStart() <= aid
 					&& aid <= ass.GetRawGroupAIDEnd()) {
 				myslot += aid % ass.GetSlotNum();
-				found = true;
-				break;
+				myslotsVector.push_back(myslot);
+				myslot += ass.GetSlotNum();
+				myslot -= aid % ass.GetSlotNum();
+
+				//found = true;
+				//break;
 			} else
 				myslot += ass.GetSlotNum();
 		}
-		if (found)
-			break;
+		//if (found)
+			//break;
 	}
-	//std::cout << "aid=" << (int)aid << ", mzslot=" << myslot<<std::endl;
+	uint32_t currentSlot = this->GetSlotNumFromRpsRawSlot(m_rpsIndexTrace, m_rawGroupTrace, m_rawSlotTrace);
+	bool found = false;
+	for (auto targetslot : myslotsVector)
+	{
+		if (targetslot > currentSlot)
+		{
+			//schedule downlink to the first next slot STA is assigned to
+			if (aid==1)
+			std::cout << "  " << targetslot;
+			myslot = targetslot;
+			found = true;
+			break;
+		}
+	}
+	// if all the next slots until the next BI are not STA slots, schedule to the first slot after the next BI
+	if (!found)
+		myslot = myslotsVector[0];
+	if (aid==1)
+	//std::cout << "\n aid=" << (int)aid << ", targetslot=" << myslot<< " current slot=" << currentSlot << std::endl;
+
 	return myslot;
 }
 
@@ -496,9 +668,9 @@ uint32_t ApWifiMac::GetSlotNumFromRpsRawSlot(uint16_t rps, uint8_t rawg,
 			break;
 	}
 	return myslot;
-	return GetSlotNumFromAid(
+	/*return GetSlotNumFromAid(
 			m_rpsset.rpsset.at(rps)->GetRawAssigmentObj(rawg).GetSlotNum())
-			+ slot;
+			+ slot;*/
 }
 
 Time ApWifiMac::GetSlotDurationFromAid(uint16_t aid) const {
@@ -936,29 +1108,37 @@ bool ApWifiMac::HasPacketsInQueueTo(Mac48Address dest) {
 	do {
 		aid++;
 	} while (m_AidToMacAddr.find(aid)->second != dest); //TODO optimize search
-	peekedPacket_VO =
-			m_rawSlotsEdca[this->GetSlotNumFromAid(aid)].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(
-					WifiMacHeader::ADDR1, dest);
-	peekedPacket_VI =
-			m_rawSlotsEdca[this->GetSlotNumFromAid(aid)].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(
-					WifiMacHeader::ADDR1, dest);
-	peekedPacket_BE =
-			m_rawSlotsEdca[this->GetSlotNumFromAid(aid)].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(
-					WifiMacHeader::ADDR1, dest);
-	peekedPacket_BK =
-			m_rawSlotsEdca[this->GetSlotNumFromAid(aid)].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(
-					WifiMacHeader::ADDR1, dest);
+
+	std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (aid);
+	for (auto targetSlot : allTargetSlots)
+	{
+		peekedPacket_VO =
+				m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(
+						WifiMacHeader::ADDR1, dest);
+		peekedPacket_VI =
+				m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(
+						WifiMacHeader::ADDR1, dest);
+		peekedPacket_BE =
+				m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(
+						WifiMacHeader::ADDR1, dest);
+		peekedPacket_BK =
+				m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(
+						WifiMacHeader::ADDR1, dest);
+		if (peekedPacket_VO != 0 || peekedPacket_VI != 0 || peekedPacket_BE != 0 || peekedPacket_BK != 0)
+			return true;
+		//NS_LOG_UNCOND("TRUE");
+	}
 	/*peekedPacket_VO = m_edca.find(AC_VO)->second->GetEdcaQueue()->PeekByAddress (WifiMacHeader::ADDR1, dest);
 	 peekedPacket_VI = m_edca.find(AC_VI)->second->GetEdcaQueue()->PeekByAddress (WifiMacHeader::ADDR1, dest);
 	 peekedPacket_BE = m_edca.find(AC_BE)->second->GetEdcaQueue()->PeekByAddress (WifiMacHeader::ADDR1, dest);
 	 peekedPacket_BK = m_edca.find(AC_BK)->second->GetEdcaQueue()->PeekByAddress (WifiMacHeader::ADDR1, dest);
 	 */
-	if (peekedPacket_VO != 0 || peekedPacket_VI != 0 || peekedPacket_BE != 0
-			|| peekedPacket_BK != 0) {
+	/*if (peekedPacket_VO != 0 || peekedPacket_VI != 0 || peekedPacket_BE != 0 || peekedPacket_BK != 0) {
 		return true;
-	} else {
-		return false;
-	}
+	}*/
+	//NS_LOG_UNCOND("FALSE");
+	return false;
+
 }
 
 uint16_t ApWifiMac::RpsIndex = 0;
@@ -979,13 +1159,17 @@ void ApWifiMac::SetaccessList(std::map<Mac48Address, bool> list) {
 				//NS_LOG_UNCOND ("aid " << aid << " stasAddr " << stasAddr);
 			}
 		}
-		uint32_t targetSlot = GetSlotNumFromAid(aid);
-		//std::cout << "________________aid=" << (int)aid << ", targetslot=" << targetSlot << std::endl;
+		/*uint32_t targetSlot = GetNextSlotNumFromAid(aid);
+		//std::cout << "________________aid=" << (int)aid << ", targetslot=" << targetSlot << std::endl;*/
 
-		m_rawSlotsEdca[targetSlot].find(AC_VO)->second->SetaccessList(list);
-		m_rawSlotsEdca[targetSlot].find(AC_VI)->second->SetaccessList(list);
-		m_rawSlotsEdca[targetSlot].find(AC_BE)->second->SetaccessList(list);
-		m_rawSlotsEdca[targetSlot].find(AC_BK)->second->SetaccessList(list);
+		std::vector <uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (aid);
+		for (auto targetSlot : allTargetSlots)
+		{
+			m_rawSlotsEdca[targetSlot].find(AC_VO)->second->SetaccessList(list);
+			m_rawSlotsEdca[targetSlot].find(AC_VI)->second->SetaccessList(list);
+			m_rawSlotsEdca[targetSlot].find(AC_BE)->second->SetaccessList(list);
+			m_rawSlotsEdca[targetSlot].find(AC_BK)->second->SetaccessList(list);
+		}
 		//NS_LOG_UNCOND ("aid " << aid << "stasAddr " << stasAddr);
 		//NS_LOG_UNCOND ( "aid "  << k << ", send " << list.find(stasAddr)->second << ", at " << Simulator::Now () << ", size " << list.size ());
 
@@ -1187,6 +1371,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		m_PageIndex = m_pageslice.GetPageindex();
 		//m_TIM.SetPageIndex (m_PageIndex);
 		uint64_t numPagedStas(0);
+
 		for (auto it = m_supportPageSlicingList.begin();
 				it != m_supportPageSlicingList.end(); ++it) {
 			if (m_stationManager->IsAssociated(it->first)
@@ -1194,6 +1379,7 @@ void ApWifiMac::SendOneBeacon(void) {
 				numPagedStas++;
 			}
 		}
+
 		//if (!m_DTIMCount && numPagedStas) NS_LOG_UNCOND ("Paged stations: " << (int)numPagedStas);
 		/*if (m_pageslice.GetPageSliceCount() == 0 && numPagedStas > 0)// special case
 		 {
