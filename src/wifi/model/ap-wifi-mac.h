@@ -24,10 +24,10 @@
 #define AP_WIFI_MAC_H
 
 #include "regular-wifi-mac.h"
-#include "ht-capabilities.h"
-#include "s1g-capabilities.h"
+//#include "ht-capabilities.h"
+//#include "s1g-capabilities.h"
 #include "amsdu-subframe-header.h"
-#include "supported-rates.h"
+//#include "supported-rates.h"
 #include "ns3/random-variable-stream.h"
 #include "rps.h"
 #include "tim.h"
@@ -37,6 +37,8 @@
 #include "extension-headers.h"
 #include "ns3/traced-value.h"
 #include "ns3/trace-source-accessor.h"
+#include "mgt-headers.h"
+
 
 
 namespace ns3 {
@@ -214,7 +216,7 @@ private:
    * \param to the address of the STA we are sending an association response to
    * \param success indicates whether the association was successful or not
    */
-  void SendAssocResp (Mac48Address to, bool success, uint8_t staType, bool makeAdditionalAid);
+  void SendAssocResp (Mac48Address to, bool success, uint8_t staType, bool makeAdditionalAid, AidRequest::ServiceCharacteristic serviceCharacteristic);
   /**
    * Forward a beacon packet to the beacon special DCF.
    */
@@ -313,6 +315,11 @@ private:
   std::vector<uint16_t> m_sensorList; //stations allowed to transmit in last beacon
   std::vector<uint16_t> m_OffloadList;
   std::vector<uint16_t> m_receivedAid;
+  std::vector<uint16_t> m_sensorAids;
+  std::vector<uint16_t> m_offloadAids;
+  std::vector<uint16_t> m_criticalAids; //serviceCharacteristic of the AidRequest is critical stations (loops)
+  std::vector<uint16_t> m_enqueuedToAids;
+  std::vector<uint16_t> m_sentToAids;
   std::map<uint16_t, Mac48Address> m_AidToMacAddr;
   std::map<Mac48Address, bool> m_accessList;
     

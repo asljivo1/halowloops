@@ -32,7 +32,7 @@
 #include "dcf-manager.h"
 #include "mac-rx-middle.h"
 #include "mac-tx-middle.h"
-#include "mgt-headers.h"
+//#include "mgt-headers.h"
 //#include "extension-headers.h"
 #include "mac-low.h"
 #include "amsdu-subframe-header.h"
@@ -431,24 +431,69 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 		//Sanity check that the TID is valid
 		NS_ASSERT(tid < 8);
 		uint32_t targetSlot = GetNextSlotNumFromAid(aid);
-		//std::cout << ">>AP enqueues to dst aid=" << (int)aid << "targetSlot=" << targetSlot << std::endl;
-		//m_rawSlotsEdca[GetSlotNumFromAid (aid)].find(QosUtilsMapTidToAc (tid))->second->Queue(packet, hdr);
 
 		// if paged both in DTIM and in TIM enqueue immediately
-		//if (IsPagedInDtim (aid))
 		if (IsPagedInDtim (aid))
 		{
-			//NS_LOG_UNCOND("++++++++++++++++++ aid=" << aid << " PAGED");
 			m_rawSlotsEdca[targetSlot][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
+			NS_LOG_DEBUG("[aid=" << aid <<"] paged in this DTIM, AP enqueues to targetSlot=" << targetSlot);
+			this->m_enqueuedToAids.push_back(aid);
 		}
 		else
 		{
 
 			if (targetSlot > GetAllSlotNumbersFromAid(aid)[0])
+			{
 				m_rawSlotsEdca[GetAllSlotNumbersFromAid(aid)[0]][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
+				NS_LOG_DEBUG ("[aid=" << aid <<"] not paged in this DTIM, AP enqueues to targetSlot=0");
+				this->m_enqueuedToAids.push_back(aid);
+			}
 			else
-				NS_LOG_UNCOND("NOT IMPLEMENTED CASE in ApWifiMac::ForwardDown. Delay for the next beacon interval because AID is not paged in the current one.");
-
+			{
+				// Target slot is slot [0] anyway. Just make sure AP will not attempt forwarding in this slot, if this is slot [0]
+				auto currentSlot = GetSlotNumFromRpsRawSlot(this->m_rpsIndexTrace, this->m_rawGroupTrace, this->m_rawSlotTrace);
+				if (currentSlot == targetSlot)
+				{
+					//if station is awake forward anyway, else postpone for the slot [0] in te next beacon interval
+					if (this->m_rpsset.rpsset[m_rpsIndexTrace]->GetRawAssigmentObj(m_rawGroupTrace).GetSlotCrossBoundary() == 0x0001)
+					{
+						//csb allowed
+						m_rawSlotsEdca[GetAllSlotNumbersFromAid(aid)[0]][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
+						NS_LOG_DEBUG ("[aid=" << aid <<"] not paged in this DTIM but awake(?) in current slot, csb allowed, AP enqueues to targetSlot=now" );
+						this->m_enqueuedToAids.push_back(aid);
+					}
+					else
+					{
+						//non-csb
+						MacLowTransmissionParameters params;
+						params.DisableRts();
+						params.DisableAck();
+						params.DisableNextData();
+						Time txTime = m_low->CalculateOverallTxTime(packet, &hdr, params);
+						Time currentOffsetSinceLastBeacon = (Simulator::Now() - this->m_lastBeaconTime);
+						auto timeRemaining = this->GetSlotStartTimeFromAid(aid) + this->GetSlotDurationFromAid(aid) + m_bufferTimeToAllowBeaconToBeReceived - currentOffsetSinceLastBeacon;
+						if (txTime < timeRemaining)
+						{
+							//TX will not cross slot boundary, OK to transmit
+							m_rawSlotsEdca[GetAllSlotNumbersFromAid(aid)[0]][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
+							NS_LOG_DEBUG ("[aid=" << aid <<"] not paged in this DTIM but awake(?) in current slot, csb not allowed, but there is enough time, AP enqueues to targetSlot=now" << targetSlot );
+							this->m_enqueuedToAids.push_back(aid);
+						}
+						else
+						{
+							// TX will cross slot boundary, postpone
+							NS_LOG_DEBUG ("Transmission will cross slot boundary. Postpone for next TXOP.");
+							void (ApWifiMac::*fp) (Ptr<const Packet>, Mac48Address, Mac48Address) = &ApWifiMac::ForwardDown;
+							Simulator::Schedule(timeRemaining + MilliSeconds (2), fp, this, packet, from, to);
+						}
+					}
+				}
+				else
+				{
+					m_rawSlotsEdca[GetAllSlotNumbersFromAid(aid)[0]][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
+					std::cout << ">>AP enqueues to dst aid=" << (int)aid << "targetSlot=" << targetSlot << std::endl;
+				}
+			}
 			//NS_LOG_UNCOND("++++++++++++++++++ aid=" << aid << " NOT PAGED");
 		}
 		//else enqueue after it is paged (next DTIM)
@@ -945,8 +990,8 @@ void ApWifiMac::SendProbeResp(Mac48Address to) {
 	m_dca->Queue(packet, hdr);
 }
 
-void ApWifiMac::SendAssocResp(Mac48Address to, bool success, uint8_t staType,
-		bool makeAdditionalAid) {
+void ApWifiMac::SendAssocResp(Mac48Address to, bool success, uint8_t staType, bool makeAdditionalAid, AidRequest::ServiceCharacteristic serviceCharacteristic)
+{
 	NS_LOG_FUNCTION(this << to << success);
 	WifiMacHeader hdr;
 	hdr.SetAssocResp();
@@ -1007,6 +1052,37 @@ void ApWifiMac::SendAssocResp(Mac48Address to, bool success, uint8_t staType,
 			}
 			m_OffloadList.push_back(aid);
 			NS_LOG_INFO("m_OffloadList =" << m_OffloadList.size ());
+		}
+
+		if (serviceCharacteristic == AidRequest::CRITICAL_SERVICE)
+		{
+			for (std::vector<uint16_t>::iterator it = m_criticalAids.begin(); it != m_criticalAids.end(); it++)
+			{
+				if (*it == aid)
+					goto Addheader;
+			}
+			m_criticalAids.push_back(aid);
+			NS_LOG_INFO("m_criticalAids =" << m_criticalAids.size ());
+		}
+		else if (serviceCharacteristic == AidRequest::SENSOR)
+		{
+			for (std::vector<uint16_t>::iterator it = m_sensorAids.begin(); it != m_sensorAids.end(); it++)
+			{
+				if (*it == aid)
+					goto Addheader;
+			}
+			m_sensorAids.push_back(aid);
+			NS_LOG_INFO("m_sensorAids =" << m_sensorAids.size ());
+		}
+		else if (serviceCharacteristic == AidRequest::OFFLOAD)
+		{
+			for (std::vector<uint16_t>::iterator it = m_offloadAids.begin(); it != m_offloadAids.end(); it++)
+			{
+				if (*it == aid)
+					goto Addheader;
+			}
+			m_offloadAids.push_back(aid);
+			NS_LOG_INFO("m_offloadAids =" << m_offloadAids.size ());
 		}
 	}
 	Addheader: packet->AddHeader(assoc);
@@ -1206,20 +1282,105 @@ void ApWifiMac::SendOneBeacon(void) {
 		S1gBeaconCompatibility compatibility;
 		compatibility.SetBeaconInterval(m_beaconInterval.GetMicroSeconds());
 		beacon.SetBeaconCompatibility(compatibility);
+		/*NS_LOG_UNCOND ("+++++++++++++++++++INIT m_enqueuedToAids size= " << m_enqueuedToAids.size());
+		for (auto aid : m_enqueuedToAids)
+		{
+			NS_LOG_UNCOND( ", " << (int)aid);
+		}
 
+		NS_LOG_UNCOND ("\n +++++++++++++++++++INIT m_sentToAids size=" << m_sentToAids.size());
+		for (auto aid : m_sentToAids)
+		{
+			NS_LOG_UNCOND( ", " << (int)aid);
+		}
+		NS_LOG_UNCOND ("\n +++++++++++++++++++m_offloadAids");
+		for (auto aid : m_offloadAids)
+		{
+			NS_LOG_UNCOND(", " << (int)aid);
+		}*/
 		RPS *m_rps;
-		if (m_updateRps) {
+		m_updateRps = true;
+		if (m_updateRps)
+		{
 			m_updateRps = false;
 			S1gRawCtr rawCtrl;
-			RPS* newRps = new RPS;
-			//rawCtrl.UpdateRAWGroupping(this->m_accessList,);
+			//RPS* newRps = new RPS;
+			std::string path = "path";
+
+			auto it=this->m_enqueuedToAids.begin();
+			while ( it != m_enqueuedToAids.end())
+			{
+				NS_LOG_UNCOND ("dst aid=" << *it);
+				std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (*it);
+				auto dest = this->m_AidToMacAddr.find(*it)->second;
+				bool stillEnqueued = false;
+
+				for (auto targetSlot : allTargetSlots)
+				{
+					auto peekedPacket_VO =
+							m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(
+									WifiMacHeader::ADDR1, dest);
+					auto peekedPacket_VI =
+							m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(
+									WifiMacHeader::ADDR1, dest);
+					auto peekedPacket_BE =
+							m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(
+									WifiMacHeader::ADDR1, dest);
+					auto peekedPacket_BK =
+							m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(
+									WifiMacHeader::ADDR1, dest);
+					if (peekedPacket_VO != 0 || peekedPacket_VI != 0 || peekedPacket_BE != 0 || peekedPacket_BK != 0)
+					{
+						//AP might have delivered packets in this slot and also enqueued others to the same next slot
+						int qlen = this->m_rawSlotsEdca[targetSlot].size() / 4;
+						if (m_enqueuedToAids.size() - qlen > 0)
+						{
+							//NS_LOG_UNCOND ("***nonempty targetslot=" << targetSlot <<" ,also in this target slot delivered num=" << m_enqueuedToAids.size() - qlen);
+							/*this->m_sentToAids.push_back(*it);
+							it = m_enqueuedToAids.erase(it);*/
+						}
+						else
+						{
+							//NS_LOG_UNCOND ("---packet for dest= " << dest <<" nonempty targetslot=" << targetSlot <<" size= " << qlen);
+							stillEnqueued = true;
+							break;
+						}
+					}
+				}
+				if (stillEnqueued)
+				{
+					//NS_LOG_UNCOND ("STILL IN QUEUE");
+					++it;
+				}
+				else
+				{
+					//NS_LOG_UNCOND ("NOT IN QUEUE");
+					this->m_sentToAids.push_back(*it);
+					it = m_enqueuedToAids.erase(it);
+					//this->m_enqueuedToAids.erase(it++);
+				}
+			}
+			/*NS_LOG_UNCOND ("+++++++++++++++++++later m_enqueuedToAids");
+			for (auto aid : m_enqueuedToAids)
+			{
+				NS_LOG_UNCOND( ", " << (int)aid);
+			}
+
+			NS_LOG_UNCOND ("\n +++++++++++++++++++later m_sentToAids");
+			for (auto aid : m_sentToAids)
+			{
+				NS_LOG_UNCOND( ", " << (int)aid);
+			}*/
+			if (this->m_rpsset.rpsset.size())
+				rawCtrl.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), path);
+			else
+				rawCtrl.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), NULL, path);
 
 
-
-			for (auto& rps : m_rpsset.rpsset) {
+			/*for (auto& rps : m_rpsset.rpsset) {
 				//Assumption 1: First RAW is always loop-RAW and all loop-RAWs have the same duration
 				Time loopSlotDurationTotal = 2 * m_loopAids.size()
-						* rps->GetRawAssigmentObj(0).GetSlotDuration();
+								* rps->GetRawAssigmentObj(0).GetSlotDuration();
 
 				//Assumption 2: In intial RAW setup, all sensors are in a single RAW
 				Time remainingTime = m_beaconInterval - loopSlotDurationTotal
@@ -1295,7 +1456,7 @@ void ApWifiMac::SendOneBeacon(void) {
 			m_rpsset.rpsset.clear();
 			m_rpsset.rpsset.push_back(newRps);
 			//delete newRps;
-			//std::cout << "POSLIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;
+			//std::cout << "POSLIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;*/
 		}
 		/*for (auto& rps : m_rpsset.rpsset)
 		 {
@@ -1623,11 +1784,21 @@ void ApWifiMac::SendOneBeacon(void) {
 						m_accessList[stasAddr] = false;
 					}
 				}
+				/*NS_LOG_UNCOND ("+++++++++++++++++++RECEIVEDDDD");
+				for (auto aid : m_receivedAid)
+				{
+					NS_LOG_UNCOND (", " << (int)aid);
+				}*/
+				m_receivedAid.clear();
+				m_sentToAids.clear();
+				m_enqueuedToAids.clear();
 			}
 		}
 		//NS_LOG_UNCOND(GetAddress () << ", " << startaid << "\t" << endaid << ", at " << Simulator::Now () << ", bufferTimeToAllowBeaconToBeReceived " << bufferTimeToAllowBeaconToBeReceived);
 	} else {
 		m_receivedAid.clear(); //release storage
+		m_sentToAids.clear();
+		this->m_enqueuedToAids.clear(); //is this ok? TODO
 		hdr.SetBeacon();
 		hdr.SetAddr1(Mac48Address::GetBroadcast());
 		hdr.SetAddr2(GetAddress());
@@ -1949,7 +2120,7 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 					//One of the Basic Rate set mode is not
 					//supported by the station. So, we return an assoc
 					//response with an error status.
-					SendAssocResp(hdr->GetAddr2(), false, 0, makeAdditionalAid);
+					SendAssocResp(hdr->GetAddr2(), false, 0, makeAdditionalAid, AidRequest::SENSOR);
 				} else {
 					//station supports all rates in Basic Rate Set.
 					//record all its supported modes in its associated WifiRemoteStation
@@ -1988,15 +2159,20 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 						if (m_aidRequestSupported)
 						{
 							AidRequest aidreq = assocReq.GetAidRequest();
-							//std::cout << "-----aidreq.GetServiceCharacteristic()=" << (int)aidreq.GetServiceCharacteristic() << std::endl;
-						}
+							auto serviceCharacteristic = aidreq.GetServiceCharacteristic();
 
-						SendAssocResp(hdr->GetAddr2(), true, sta_type,
-								makeAdditionalAid);
+							//std::cout << "-----aidreq.GetServiceCharacteristic()=" << (int)aidreq.GetServiceCharacteristic() << std::endl;
+								SendAssocResp(hdr->GetAddr2(), true, sta_type, makeAdditionalAid, serviceCharacteristic);
+						}
+						else
+						{
+
+						SendAssocResp(hdr->GetAddr2(), true, sta_type, makeAdditionalAid, static_cast<AidRequest::ServiceCharacteristic>(sta_type));
+						}
 					} else {
 						//send assoc response with success status.
 						SendAssocResp(hdr->GetAddr2(), true, 0,
-								makeAdditionalAid);
+								makeAdditionalAid, AidRequest::SENSOR);
 					}
 
 				}

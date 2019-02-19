@@ -206,7 +206,7 @@ OffloadStation::GetFailedTransmissionCount (void) const
 //
 S1gRawCtr::S1gRawCtr ()
 {
-   RpsIndex = 0;
+   /*RpsIndex = 0;
    m_offloadFailedMax = 5;
    sensorpacketsize = 1;
    offloadpacketsize = 1;
@@ -219,12 +219,17 @@ S1gRawCtr::S1gRawCtr ()
     m_beaconOverhead = 0; // us
 
     MaxSlotForSensor = 40; //In order to guarantee channel for offload stations.
-    m_rps = new RPS;
+    m_rps = new RPS;*/
 
+	m_nTxs = 0;
+	m_prevRps = NULL;
+	m_prevPrevRps = NULL;
+	m_rps = new RPS;
 }
 
 S1gRawCtr::~S1gRawCtr ()
 {
+	deleteRps();
 }
 
 void
@@ -994,11 +999,32 @@ S1gRawCtr::GetRPS ()
 
 // Beacon duration), before that use NGroup=1 and initialize by ap-wifi-mac
 RPS
-S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> m_sensorlist, std::vector<uint16_t> m_OffloadList, std::vector<uint16_t> m_receivedAid, uint64_t BeaconInterval, std::string outputpath)
+S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> m_criticalList, std::vector<uint16_t> m_sensorList, std::vector<uint16_t> m_offloadList, std::vector<uint16_t> m_receivedFromAids, std::vector<uint16_t> m_sentToAids, std::vector<uint16_t> m_enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, std::string outputpath)
  {
      NS_ASSERT ("S1gRawCtr should not be called");
      
      m_beaconInterval = BeaconInterval;
+     if (m_t_succ.empty() && !m_prevRps)
+     {
+
+    	 //initial
+    	 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
+    	 uint32_t duration = 500 + count * 120;
+    	 RPS::RawAssignment *m_raw = new RPS::RawAssignment;
+    	 m_raw->SetRawControl(0);  //support paged STA or not
+    	 m_raw->SetSlotCrossBoundary(1);
+    	 m_raw->SetSlotDurationCount(count);
+    	 m_raw->SetSlotNum(1);
+    	 uint8_t page=0;
+    	 uint16_t aid_start=0;
+    	 uint16_t aid_end=0;
+    	 uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | page;
+    	 m_raw->SetRawGroup(rawinfo);
+    	 m_rps->SetRawAssignment(*m_raw);
+    	 delete m_raw;
+     }
+
+     /*
      //currentId++; //beaconInterval counter
      //work here
      UdpateSensorStaInfo (m_sensorlist,  m_receivedAid, outputpath);
@@ -1020,7 +1046,8 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> m_sensorlist, std::vector<u
      m_rps = new RPS;
      configureRAW ();
      RPS m_rpsAP =  GetRPS ();
-     return m_rpsAP;
+     return m_rpsAP;*/
+     return *m_rps;
 }
 
 void
@@ -1068,14 +1095,14 @@ S1gRawCtr::deleteRps ()
      rawinfo = (aid_end << 13) | (aid_start << 2) | page;
      m_raw->SetRawGroup (rawinfo);
 
-        // NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppingff =");
+        //NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppingff =");
 
      m_rps->SetRawAssignment(*m_raw);
 
-        // NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppinggg =");
+        //NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppinggg =");
 
      rpslist.rpsset.push_back (m_rps); //only one RPS in rpslist actually, update info
-        // NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppinghh =");
+        //NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppinghh =");
 
  } */
 

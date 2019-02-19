@@ -33,28 +33,19 @@
 namespace ns3 {
     
 struct UpdateInfo
-    //(uint64_t x, uint64_t y, uint64_t z, bool success, uint64_t q, uint64_t p,uint64_t n, bool good)
-    {
-        uint64_t lastTryBFpreSuccessId;
+{
+	uint64_t lastTryBFpreSuccessId;
         uint64_t preSuccessId;
         uint64_t preUnsuccessId;
         bool preTrySuccess;
-        
+
         uint64_t CurrentSuccessId;
         uint64_t CurrentUnSuccessId;
         uint64_t lastTryBFCurrentSuccessId;
         bool CurrentTrySuccess;
 
-        
-        /*UpdateInfo (): lastTryBFpreSuccessId(x),
-                       preSuccessId(y),
-                       preUnsuccessId(z),
-                       preTrySuccess(success),
-                       CurrentSuccessId(q),
-                       CurrentUnSuccessId(p),
-               lastTryBFCurrentSuccessId(n),
-                      CurrentTrySuccess(good){}*/
-    };
+
+};
     
 class Sensor
 {
@@ -161,8 +152,8 @@ public:
 
   S1gRawCtr ();
   virtual ~S1gRawCtr ();
-
-    RPS  UpdateRAWGroupping (std::vector<uint16_t> m_aidlist, std::vector<uint16_t> m_aidOffloadList, std::vector<uint16_t> m_receivedAid, uint64_t BeaconInterval, std::string outputpath);
+//this->m_criticalAids, this->m_sensorAids, this->m_offloadAids, this->GetBeaconInterval(), this->m_rpsset.rpsset.back()
+    RPS  UpdateRAWGroupping (std::vector<uint16_t> m_criticalList, std::vector<uint16_t> m_sensorList, std::vector<uint16_t> m_offloadList, std::vector<uint16_t> m_receivedFromAids, std::vector<uint16_t> m_sentToAids, std::vector<uint16_t> m_enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, std::string outputpath);
 
   void configureRAW ();
   RPS GetRPS ();
@@ -204,6 +195,13 @@ public:
     
 private:
     
+	std::vector <Time> m_t_succ;
+	uint32_t m_nTxs = 0;
+	RPS *m_prevRps;
+	RPS *m_prevPrevRps;
+	RPS * m_rps;
+	uint64_t m_beaconInterval;
+
   uint64_t m_rawslotDuration; //us
   uint64_t m_maybeAirtimeSensor;
   uint16_t m_numSensorAllowedToSend;
@@ -218,7 +216,7 @@ private:
   uint16_t m_offloadFailedMax;
   uint16_t m_numOffloadAllowedToSend;
     
-  uint64_t m_beaconInterval;
+  //uint64_t m_beaconInterval;
   uint16_t  sensorpacketsize;
   uint16_t  offloadpacketsize;
     
@@ -229,7 +227,7 @@ private:
   std::vector<RPS::RawAssignment *> RawAssignmentList;
     
   uint16_t RpsIndex;
-  RPS * m_rps;
+  //RPS * m_rps;
   RPSVector rpslist;
     
     bool  m_receivedsuccess;
