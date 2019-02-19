@@ -1174,7 +1174,7 @@ void configureCoapServer() {
 	if (config.nControlLoops > 0)
 	{
 		CoapServerHelper clServer(5683);
-		clServer.SetAttribute("ProcessingDelay", TimeValue (MilliSeconds (1)));
+		clServer.SetAttribute("ProcessingDelay", TimeValue (MilliSeconds (10)));
 		for (int i = 0; i < config.nControlLoops; i++)
 		{
 			serverApp = clServer.Install(externalNodes.Get(i));
@@ -1283,7 +1283,7 @@ void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 	clientApp.Get(0)->TraceConnectWithoutContext("Tx", MakeCallback(&NodeEntry::OnCoapPacketSent, nodes[n]));
 	clientApp.Get(0)->TraceConnectWithoutContext("Rx", MakeCallback(&NodeEntry::OnCoapPacketReceived, nodes[n]));
 	double random = m_rv->GetValue(0, config.cycleTime);
-	clientApp.Start(MicroSeconds(37820));//0+random //37820 //33890
+	clientApp.Start(MicroSeconds(0+random));//0+random //37820 //33890
 	clientApp.Stop(Seconds(config.simulationTime));
 
 }
@@ -1426,12 +1426,15 @@ void printStatsToFile (bool print)
 					os << it->second.GetMicroSeconds() << " ";
 				os << endl;*/ // These values are equal to the m_receivedTimeBySeqClient
 				os << "dT =\n";
+				std::cout << "dT =\n";
 				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_receivedTimeBySeqClient.begin(), jt = --stats.get(i).m_receivedTimeBySeqClient.end(); it != jt; ++it)
 				{
 					auto dt = stats.get(i).m_sentTimeBySeqClient[it->first + 1].GetMicroSeconds() - it->second.GetMicroSeconds();
 					os << dt << " ";
+					std::cout << dt << " ";
 				}
 				os << endl;
+				cout << endl;
 				os << "Goodput=" << (stats.get(i).getGoodputKbit(stats.TimeWhenEverySTAIsAssociated)) << "Kbit" << endl; //CORRECT
 			}
 			else

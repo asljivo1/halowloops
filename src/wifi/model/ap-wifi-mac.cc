@@ -40,6 +40,7 @@
 #include "ns3/uinteger.h"
 #include "wifi-mac-queue.h"
 #include <map>
+#include "s1g-raw-control.h"
 
 namespace ns3 {
 
@@ -464,7 +465,7 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 bool
 ApWifiMac::IsPagedInDtim (uint32_t aid)
 {
-	NS_LOG_UNCOND("+++++++++++++++++++++++GetPageBitmapLength=" << (int)m_pageslice.GetPageBitmapLength());
+	//NS_LOG_UNCOND("+++++++++++++++++++++++GetPageBitmapLength=" << (int)m_pageslice.GetPageBitmapLength());
 	if (!m_pageslice.GetPageBitmapLength())
 		return false;
 
@@ -1209,7 +1210,11 @@ void ApWifiMac::SendOneBeacon(void) {
 		RPS *m_rps;
 		if (m_updateRps) {
 			m_updateRps = false;
+			S1gRawCtr rawCtrl;
 			RPS* newRps = new RPS;
+			//rawCtrl.UpdateRAWGroupping(this->m_accessList,);
+
+
 
 			for (auto& rps : m_rpsset.rpsset) {
 				//Assumption 1: First RAW is always loop-RAW and all loop-RAWs have the same duration
