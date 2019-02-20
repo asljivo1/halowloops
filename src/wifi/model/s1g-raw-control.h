@@ -153,7 +153,7 @@ public:
   S1gRawCtr ();
   virtual ~S1gRawCtr ();
 //this->m_criticalAids, this->m_sensorAids, this->m_offloadAids, this->GetBeaconInterval(), this->m_rpsset.rpsset.back()
-    RPS  UpdateRAWGroupping (std::vector<uint16_t> m_criticalList, std::vector<uint16_t> m_sensorList, std::vector<uint16_t> m_offloadList, std::vector<uint16_t> m_receivedFromAids, std::vector<uint16_t> m_sentToAids, std::vector<uint16_t> m_enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, std::string outputpath);
+    RPS  UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath);
 
   void configureRAW ();
   RPS GetRPS ();
@@ -201,6 +201,7 @@ private:
 	RPS *m_prevPrevRps;
 	RPS * m_rps;
 	uint64_t m_beaconInterval;
+
 
   uint64_t m_rawslotDuration; //us
   uint64_t m_maybeAirtimeSensor;

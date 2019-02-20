@@ -431,7 +431,6 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 		//Sanity check that the TID is valid
 		NS_ASSERT(tid < 8);
 		uint32_t targetSlot = GetNextSlotNumFromAid(aid);
-
 		// if paged both in DTIM and in TIM enqueue immediately
 		if (IsPagedInDtim (aid))
 		{
@@ -455,7 +454,7 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 				if (currentSlot == targetSlot)
 				{
 					//if station is awake forward anyway, else postpone for the slot [0] in te next beacon interval
-					if (this->m_rpsset.rpsset[m_rpsIndexTrace]->GetRawAssigmentObj(m_rawGroupTrace).GetSlotCrossBoundary() == 0x0001)
+					if (this->m_rpsset.rpsset.at(m_rpsIndexTrace-1)->GetRawAssigmentObj(m_rawGroupTrace - 1).GetSlotCrossBoundary() == 0x01)
 					{
 						//csb allowed
 						m_rawSlotsEdca[GetAllSlotNumbersFromAid(aid)[0]][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
@@ -491,14 +490,11 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 				else
 				{
 					m_rawSlotsEdca[GetAllSlotNumbersFromAid(aid)[0]][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
-					std::cout << ">>AP enqueues to dst aid=" << (int)aid << "targetSlot=" << targetSlot << std::endl;
 				}
 			}
-			//NS_LOG_UNCOND("++++++++++++++++++ aid=" << aid << " NOT PAGED");
 		}
 		//else enqueue after it is paged (next DTIM)
 
-		//m_edca[QosUtilsMapTidToAc (tid)]->Queue (packet, hdr);
 	} else {
 		// queue the packet in the specific raw slot period DCA
 		m_rawSlotsDca[GetNextSlotNumFromAid(aid)]->Queue(packet, hdr);
@@ -687,8 +683,8 @@ uint32_t ApWifiMac::GetNextSlotNumFromAid(uint16_t aid) const {
 	// if all the next slots until the next BI are not STA slots, schedule to the first slot after the next BI
 	if (!found)
 		myslot = myslotsVector[0];
-	if (aid==1)
-	//std::cout << "\n aid=" << (int)aid << ", targetslot=" << myslot<< " current slot=" << currentSlot << std::endl;
+	/*if (aid==1)
+	std::cout << "\n aid=" << (int)aid << ", targetslot=" << myslot<< " current slot=" << currentSlot << std::endl;*/
 
 	return myslot;
 }
@@ -1305,7 +1301,7 @@ void ApWifiMac::SendOneBeacon(void) {
 			m_updateRps = false;
 			S1gRawCtr rawCtrl;
 			//RPS* newRps = new RPS;
-			std::string path = "path";
+			std::string path = "./OptimalRawGroup/results-coap/loops-optimal-";
 
 			auto it=this->m_enqueuedToAids.begin();
 			while ( it != m_enqueuedToAids.end())
@@ -1372,9 +1368,9 @@ void ApWifiMac::SendOneBeacon(void) {
 				NS_LOG_UNCOND( ", " << (int)aid);
 			}*/
 			if (this->m_rpsset.rpsset.size())
-				rawCtrl.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), path);
+				rawCtrl.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
 			else
-				rawCtrl.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), NULL, path);
+				rawCtrl.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), NULL, this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
 
 
 			/*for (auto& rps : m_rpsset.rpsset) {
