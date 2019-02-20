@@ -22,6 +22,7 @@
 #include "ns3/assert.h"
 #include "ns3/log.h" //for test
 #include <sstream>
+#include <iomanip>
 
 namespace ns3 {
 
@@ -342,6 +343,19 @@ WifiInformationElementId
 RPS::ElementId () const
 {
   return IE_RPS;
+}
+
+void
+RPS::Print (std::ostream &os) const
+{
+	os << "Number of RAW groups = " << (int)GetNumberOfRawGroups() << std::endl << std::endl;
+	os << std::left << std::setw(20) << "RAW no." << std::setw(3) << "|" << std::setw(20) << "RawControl" << std::setw(20) << "SlotCrossBoundary" << std::setw(20) << "SlotFormat" << std::setw(20) << "SlotDurationCount" << std::setw(20) << "SlotNum" << std::setw(20) << "PageIndex" << std::setw(20) << "AidStart" << std::setw(20) << "AidEnd" << std::endl;
+
+	for (int i = 0; i < GetNumberOfRawGroups(); i++)
+	{
+		RPS::RawAssignment raw = this->GetRawAssigmentObj(i);
+		os << std::left << std::setw(20) << i << std::setw(3) << "|" << std::setw(20) << (int)raw.GetRawControl() << std::setw(20) << (int)raw.GetSlotCrossBoundary() << std::setw(20) << (int)raw.GetSlotFormat() << std::setw(20) << (int)raw.GetSlotDurationCount() << std::setw(20) << (int)raw.GetSlotNum() << std::setw(20) << (int)raw.GetRawGroupPage() << std::setw(20) << (int)raw.GetRawGroupAIDStart() << std::setw(20) << (int)raw.GetRawGroupAIDEnd() << std::endl;
+	}
 }
 
 uint8_t

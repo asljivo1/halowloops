@@ -120,6 +120,7 @@ public:
 
   WifiInformationElementId ElementId () const;
   uint8_t GetInformationFieldSize () const;
+  void Print (std::ostream &os) const;
     
   void SerializeInformationField (Buffer::Iterator start) const;
   uint8_t DeserializeInformationField (Buffer::Iterator start, uint8_t length);
