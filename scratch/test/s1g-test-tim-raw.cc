@@ -181,7 +181,7 @@ RPSVector configureRAW (RPSVector rpslist, string RAWConfigFile)
 			//config.nRawGroupsPerRpsList.push_back(NRAWPERBEACON);
 		}
 		myfile.close();
-		config.NRawSta = biggestAid;//rpslist.rpsset[rpslist.rpsset.size()-1]->GetRawAssigmentObj(NRAWPERBEACON-1).GetRawGroupAIDEnd();
+		//config.NRawSta = biggestAid;//rpslist.rpsset[rpslist.rpsset.size()-1]->GetRawAssigmentObj(NRAWPERBEACON-1).GetRawGroupAIDEnd();
 	}
 	else
 	{
@@ -1601,8 +1601,8 @@ int main(int argc, char *argv[]) {
 	config = Configuration(argc, argv);
 
 	config.rps = configureRAW(config.rps, config.RAWConfigFile);
-	config.Nsta = config.NRawSta;
-
+	//config.Nsta = config.NRawSta;
+	config.NRawSta = config.Nsta;
 	configurePageSlice ();
 	configureTIM ();
 	//checkRawAndTimConfiguration ();
