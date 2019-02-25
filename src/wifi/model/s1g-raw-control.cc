@@ -246,7 +246,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 {
 	for (std::vector<uint16_t>::iterator ci = criticalAids.begin(); ci != criticalAids.end(); ci++)
 	{
-		if (LookupSensorSta (*ci) == nullptr)
+		if (LookupCriticalSta (*ci) == nullptr)
 		{
 			SensorActuator * sta = new SensorActuator;
 			sta->SetAid (*ci);
@@ -295,7 +295,6 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 
 	for (std::vector<uint16_t>::iterator ci = receivedFromAids.begin(); ci != receivedFromAids.end(); ci++)
 	{
-		uint16_t nTX = 0;
 		bool match = false;
 		for (std::vector<uint16_t>::iterator it = m_aidList.begin(); it != m_aidList.end(); it++)
 		{
@@ -305,7 +304,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 				break;
 			}
 		}
-
+		uint16_t nTX = 0;
 		SensorActuator * stationTransmit = LookupCriticalSta (*ci);
 		if (stationTransmit != nullptr && !match)
 		{
@@ -316,7 +315,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 			{
 				if (*ci == receivedFromAids[i])
 				{
-					stationTransmit->m_nTx++;
+					stationTransmit->m_nTx=++nTX;
 					stationTransmit->m_tSuccessPreLast = stationTransmit->m_tSuccessLast;
 					stationTransmit->m_tSuccessLast = receivedTimes[i];
 				}
@@ -1221,7 +1220,8 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
 
     	 }
 
-    	 m_criticalStations.clear();
+    	 //m_criticalStations.clear();
+
     	 m_aidList.clear();
 
      }
