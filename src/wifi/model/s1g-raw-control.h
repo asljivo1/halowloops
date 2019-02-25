@@ -183,7 +183,7 @@ public:
   void deleteRps ();
   void UdpateSensorStaInfo (std::vector<uint16_t> m_sensorlist, std::vector<uint16_t> m_receivedAid, std::string outputpath); //need to change, controlled by AP
   void UdpateOffloadStaInfo (std::vector<uint16_t> m_OffloadList, std::vector<uint16_t>  receivedStas, std::string outputpath);
-  void UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::string outputpath);
+  void UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::string outputpath);
 
   void calculateActiveOffloadSta ();
   void SetOffloadAllowedToSend ();
@@ -216,6 +216,7 @@ public:
     
     uint16_t MaxSlotForSensor;
     
+    std::vector<uint16_t> m_aidListPaged;
     std::vector<uint16_t> m_aidList; //stations allowed to transmit in last beacon
     std::vector<uint16_t>::iterator m_aidListCI;
     std::vector<uint16_t> m_aidOffloadList;

@@ -242,7 +242,7 @@ S1gRawCtr::~S1gRawCtr ()
 }
 
 void
-S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::string outputpath)
+S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::string outputpath)
 {
 	for (std::vector<uint16_t>::iterator ci = criticalAids.begin(); ci != criticalAids.end(); ci++)
 	{
@@ -322,13 +322,46 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 			}
 		}
 	}
-	NS_LOG_UNCOND ("AID LIST:");
+
+	for (std::vector<uint16_t>::iterator ci = enqueuedToAids.begin(); ci != enqueuedToAids.end(); ci++)
+	{
+		bool match = false;
+		for (std::vector<uint16_t>::iterator it = m_aidListPaged.begin(); it != m_aidListPaged.end(); it++)
+		{
+			if (*ci == *it)
+			{
+				match = true;
+				break;
+			}
+		}
+
+		SensorActuator * stationTransmit = LookupCriticalSta (*ci);
+		if (stationTransmit != nullptr && !match)
+		{
+			m_aidListPaged.push_back (*ci);
+			int numpack = 0;
+			for (int i = 0; i < enqueuedToAids.size(); i++)
+			{
+				if (*ci == enqueuedToAids[i])
+				{
+					stationTransmit->m_paged=true;
+					stationTransmit->m_pendingDownlinkPackets = ++numpack;
+				}
+			}
+		}
+	}
+	/*NS_LOG_UNCOND ("AID LIST:");
 	for (std::vector<uint16_t>::iterator it = m_aidList.begin(); it != m_aidList.end(); it++)
 	{
 		SensorActuator * s = LookupCriticalSta (*it);
 		NS_LOG_UNCOND ("aid=" << *it << ", m_nTx=" << s->m_nTx << ", m_tSuccessPreLast=" << s->m_tSuccessPreLast << ", m_tSuccessLast=" << s->m_tSuccessLast);
 	}
-
+	NS_LOG_UNCOND ("AID PAGED LIST:");
+	for (std::vector<uint16_t>::iterator it = m_aidListPaged.begin(); it != m_aidListPaged.end(); it++)
+	{
+		SensorActuator * s = LookupCriticalSta (*it);
+		NS_LOG_UNCOND ("aid=" << *it << ", m_pendingDownlinkPackets=" << s->m_pendingDownlinkPackets);
+	}*/
 }
 
 void
@@ -1206,7 +1239,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      }
      else
      {
-    	 UpdateCriticalStaInfo (criticalList, receivedFromAids, receivedTimes, outputpath);
+    	 UpdateCriticalStaInfo (criticalList, receivedFromAids, enqueuedToAids, receivedTimes, outputpath);
     	 //not initial, there was a non-empty RPS in the previous beacon but no successful receptions??????
     	 //2 possibilities:
     	 //   1) Unlucky RAW configuration: packets were enqueued at STA after RAW so they couldn't be TXed
@@ -1223,7 +1256,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     	 //m_criticalStations.clear();
 
     	 m_aidList.clear();
-
+    	 m_aidListPaged.clear();
      }
      /*else if (!m_t_succ.empty() && m_prevRps)
      {
