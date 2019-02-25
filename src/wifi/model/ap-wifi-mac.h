@@ -315,6 +315,7 @@ private:
   std::vector<uint16_t> m_sensorList; //stations allowed to transmit in last beacon
   std::vector<uint16_t> m_OffloadList;
   std::vector<uint16_t> m_receivedAid;
+  std::vector<Time> m_receivedTimes;
   std::vector<uint16_t> m_sensorAids;
   std::vector<uint16_t> m_offloadAids;
   std::vector<uint16_t> m_criticalAids; //serviceCharacteristic of the AidRequest is critical stations (loops)

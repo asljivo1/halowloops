@@ -1299,7 +1299,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		if (m_updateRps)
 		{
 			m_updateRps = false;
-			S1gRawCtr rawCtrl;
+
 			//RPS* newRps = new RPS;
 			std::string path = "./OptimalRawGroup/results-coap/loops-optimal-";
 
@@ -1368,9 +1368,9 @@ void ApWifiMac::SendOneBeacon(void) {
 				NS_LOG_UNCOND( ", " << (int)aid);
 			}*/
 			if (this->m_rpsset.rpsset.size())
-				rawCtrl.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
+				m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
 			else
-				rawCtrl.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), NULL, this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
+				m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), NULL, this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
 
 
 			/*for (auto& rps : m_rpsset.rpsset) {
@@ -1786,6 +1786,7 @@ void ApWifiMac::SendOneBeacon(void) {
 					NS_LOG_UNCOND (", " << (int)aid);
 				}*/
 				m_receivedAid.clear();
+				m_receivedTimes.clear();
 				m_sentToAids.clear();
 				m_enqueuedToAids.clear();
 			}
@@ -1793,6 +1794,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		//NS_LOG_UNCOND(GetAddress () << ", " << startaid << "\t" << endaid << ", at " << Simulator::Now () << ", bufferTimeToAllowBeaconToBeReceived " << bufferTimeToAllowBeaconToBeReceived);
 	} else {
 		m_receivedAid.clear(); //release storage
+		m_receivedTimes.clear();
 		m_sentToAids.clear();
 		this->m_enqueuedToAids.clear(); //is this ok? TODO
 		hdr.SetBeacon();
@@ -2011,7 +2013,7 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 				&& m_stationManager->IsAssociated(from)) {
 			Mac48Address to = hdr->GetAddr3();
 			if (to == GetAddress()) {
-				NS_LOG_DEBUG("frame for me from=" << from);
+				NS_LOG_DEBUG("frame for me from=" << from << " at " << Simulator::Now());
 				if (hdr->IsQosData()) {
 					if (hdr->IsQosAmsdu()) {
 						NS_LOG_DEBUG(
@@ -2030,6 +2032,7 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 				uint8_t aid_h = mac[4] & 0x1f;
 				uint16_t aid = (aid_h << 8) | (aid_l << 0); //assign mac address as AID
 				m_receivedAid.push_back(aid); //to change
+				m_receivedTimes.push_back(Simulator::Now());
 			} else if (to.IsGroup() || m_stationManager->IsAssociated(to)) {
 				NS_LOG_DEBUG("forwarding frame from=" << from << ", to=" << to);
 				Ptr<Packet> copy = packet->Copy();

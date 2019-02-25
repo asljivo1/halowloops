@@ -43,10 +43,8 @@ struct UpdateInfo
         uint64_t CurrentUnSuccessId;
         uint64_t lastTryBFCurrentSuccessId;
         bool CurrentTrySuccess;
-
-
 };
-    
+
 class Sensor
 {
 public:
@@ -107,6 +105,30 @@ private:
     bool m_everSuccess;
 };
     
+class SensorActuator : public Sensor
+{
+public:
+	SensorActuator ();
+	virtual ~SensorActuator ();
+
+	uint32_t m_pendingDownlinkPackets;
+	bool m_paged;
+
+	uint64_t m_nTx;
+	Time m_tSuccessLast;
+	Time m_tSuccessPreLast;
+
+	Time m_tInterval;
+	Time m_tIntervalMin;
+	Time m_tIntervalMax;
+
+	Time m_tEnqMin;
+
+private:
+
+
+};
+
 class OffloadStation
 {
 public:
@@ -153,7 +175,7 @@ public:
   S1gRawCtr ();
   virtual ~S1gRawCtr ();
 //this->m_criticalAids, this->m_sensorAids, this->m_offloadAids, this->GetBeaconInterval(), this->m_rpsset.rpsset.back()
-    RPS  UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath);
+    RPS  UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath);
 
   void configureRAW ();
   RPS GetRPS ();
@@ -161,6 +183,8 @@ public:
   void deleteRps ();
   void UdpateSensorStaInfo (std::vector<uint16_t> m_sensorlist, std::vector<uint16_t> m_receivedAid, std::string outputpath); //need to change, controlled by AP
   void UdpateOffloadStaInfo (std::vector<uint16_t> m_OffloadList, std::vector<uint16_t>  receivedStas, std::string outputpath);
+  void UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::string outputpath);
+
   void calculateActiveOffloadSta ();
   void SetOffloadAllowedToSend ();
   
@@ -171,6 +195,7 @@ public:
   void calculateMaybeAirtime (void);
   void SetSensorAllowedToSend (void);
   Sensor * LookupSensorSta (uint16_t aid);
+  SensorActuator * LookupCriticalSta (uint16_t aid);
   OffloadStation * LookupOffloadSta (uint16_t aid); //can be combined with function LookupSensorSta.
     
   std::vector<uint16_t>::iterator  LookupLastTransmission (uint16_t aid);
@@ -180,6 +205,10 @@ public:
     typedef std::vector<Sensor *>::iterator StationsCI;
     Stations m_stations;
     
+    typedef std::vector<SensorActuator *> CriticalStations;
+    typedef std::vector<SensorActuator *>::iterator CriticalStationsCI;
+    CriticalStations m_criticalStations;
+
     typedef std::vector<OffloadStation *> OffloadStations;
     typedef std::vector<OffloadStation *>::iterator OffloadStationsCI;
     OffloadStations m_offloadStations;

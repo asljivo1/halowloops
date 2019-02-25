@@ -59,17 +59,26 @@ NS_LOG_COMPONENT_DEFINE ("S1gRawCtr");
 
 //NS_OBJECT_ENSURE_REGISTERED (S1gRawCtr);
 
+SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0)
+{
+
+}
+
+SensorActuator::~SensorActuator (void)
+{
+}
+
 //** AP update info after RAW ends(right before next beacon is sent)
 //list of sensor allowed to transmit in last beacon ************
 Sensor::Sensor ()
 {
-  last_transmissionInterval = 1;
-    last2_transmissionInterval = 1;
-    m_transmissionIntervalMax =1;
-    m_transmissionIntervalMin = 1;
-    m_transInOneBeacon = 1;
-    m_transIntervalListSize = 5;
-    m_index = 0;
+	last_transmissionInterval = 1;
+	last2_transmissionInterval = 1;
+	m_transmissionIntervalMax =1;
+	m_transmissionIntervalMin = 1;
+	m_transInOneBeacon = 1;
+	m_transIntervalListSize = 5;
+	m_index = 0;
 }
 
 Sensor::~Sensor ()
@@ -222,14 +231,105 @@ S1gRawCtr::S1gRawCtr ()
     m_rps = new RPS;*/
 	currentId = 0;
 	m_nTxs = 0;
-	m_prevRps = NULL;
-	m_prevPrevRps = NULL;
+	m_prevRps = nullptr;
+	m_prevPrevRps = nullptr;
 	m_rps = new RPS;
 }
 
 S1gRawCtr::~S1gRawCtr ()
 {
 	deleteRps();
+}
+
+void
+S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::string outputpath)
+{
+	for (std::vector<uint16_t>::iterator ci = criticalAids.begin(); ci != criticalAids.end(); ci++)
+	{
+		if (LookupSensorSta (*ci) == nullptr)
+		{
+			SensorActuator * sta = new SensorActuator;
+			sta->SetAid (*ci);
+
+			sta->SetNumPacketsReceived(0);
+			m_criticalStations.push_back (sta);
+
+			std::ostringstream ss;
+			ss.clear ();
+			ss.str ("");
+			ss << (*ci);
+			std::string aidstring = ss.str();
+			sensorfile = outputpath + aidstring + ".txt";
+			std::ofstream outputfile;
+			outputfile.open (sensorfile, std::ios::out | std::ios::app);
+			outputfile.close();
+
+			NS_LOG_UNCOND ("initial, aid = " << *ci);
+
+		}
+	}
+	bool disassoc;
+	CriticalStationsCI itcheck = m_criticalStations.begin();
+	for (uint16_t i = 0; i < m_criticalStations.size(); i++)
+	{
+		disassoc = true;
+		for (std::vector<uint16_t>::iterator ci = criticalAids.begin(); ci != criticalAids.end(); ci++)
+		{
+			if ((*itcheck)->GetAid ()  == *ci)
+			{
+				disassoc = false;
+				if (i < m_criticalStations.size() - 1)
+					itcheck++;  //avoid itcheck increase to m_sensorlist.end()
+				break;
+			}
+		}
+
+		if (disassoc == true)
+		{
+			NS_LOG_UNCOND ( "Aid " << (*itcheck)->GetAid () << " erased from m_stations since disassociated");
+			m_criticalStations.erase(itcheck);
+		}
+	}
+
+	NS_LOG_UNCOND ("receivedFromAids.size () = " << receivedFromAids.size () << ", m_criticalStations.size() = " << m_criticalStations.size() << ", currentBeacon = " << currentId);
+
+	for (std::vector<uint16_t>::iterator ci = receivedFromAids.begin(); ci != receivedFromAids.end(); ci++)
+	{
+		uint16_t nTX = 0;
+		bool match = false;
+		for (std::vector<uint16_t>::iterator it = m_aidList.begin(); it != m_aidList.end(); it++)
+		{
+			if (*ci == *it)
+			{
+				match = true;
+				break;
+			}
+		}
+
+		SensorActuator * stationTransmit = LookupCriticalSta (*ci);
+		if (stationTransmit != nullptr && !match)
+		{
+			m_aidList.push_back (*ci);
+			//NS_LOG_UNCOND ("stations of aid " << *it << " received " << m_numReceived << " packets");
+
+			for (int i = 0; i < receivedFromAids.size(); i++)
+			{
+				if (*ci == receivedFromAids[i])
+				{
+					stationTransmit->m_nTx++;
+					stationTransmit->m_tSuccessPreLast = stationTransmit->m_tSuccessLast;
+					stationTransmit->m_tSuccessLast = receivedTimes[i];
+				}
+			}
+		}
+	}
+	NS_LOG_UNCOND ("AID LIST:");
+	for (std::vector<uint16_t>::iterator it = m_aidList.begin(); it != m_aidList.end(); it++)
+	{
+		SensorActuator * s = LookupCriticalSta (*it);
+		NS_LOG_UNCOND ("aid=" << *it << ", m_nTx=" << s->m_nTx << ", m_tSuccessPreLast=" << s->m_tSuccessPreLast << ", m_tSuccessLast=" << s->m_tSuccessLast);
+	}
+
 }
 
 void
@@ -999,12 +1099,12 @@ S1gRawCtr::GetRPS ()
 
 // Beacon duration), before that use NGroup=1 and initialize by ap-wifi-mac
 RPS
-S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath)
+S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath)
  {
      NS_ASSERT ("S1gRawCtr should not be called");
      
      m_beaconInterval = BeaconInterval;
-     if (m_t_succ.empty() && !m_prevRps)
+     if (m_prevRps == nullptr)
      {
 
     	 //initial
@@ -1052,7 +1152,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | page;
     				 m_raw->SetRawGroup(rawinfo);
     				 m_raw->SetSlotNum(1);
-    				 uint32_t count = (m_beaconInterval - 5600 - 500) / 120;
+    				 uint32_t count = (m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds() - 500) / 120;
     				 m_raw->SetSlotDurationCount(count);
     			 }
     		 }
@@ -1100,16 +1200,37 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     			 delete m_raw;
     		 }
     	 }
-    	 /*else
-    	 {
-    		 NS_LOG_UNCOND ("THERE IS NO CRITICAL STATIONS. DO NOT CALL THIS RAW OPTIMIZATION ALGORITHM!");
-    		 NS_ASSERT (false);
-    	 }*/
+
+    	 this->m_prevRps = new RPS;
+    	 *m_prevRps = *m_rps;
+    	 NS_LOG_UNCOND ("+++++++emptyyy RPSSSS HEREEEEE" );
      }
      else
      {
-    	 //not initial, there was a non-empty RPS in the previous beacon
+    	 UpdateCriticalStaInfo (criticalList, receivedFromAids, receivedTimes, outputpath);
+    	 //not initial, there was a non-empty RPS in the previous beacon but no successful receptions??????
+    	 //2 possibilities:
+    	 //   1) Unlucky RAW configuration: packets were enqueued at STA after RAW so they couldn't be TXed
+    	 //	  2) t_int is longer than beacon interval, unused RAW
+    	 // AP cannot know which case is it at this point
+
+    	 //our strategy is to keep the same RAW grouping but shift in time for beacon_interval/2
+    	 // TODO experiment with this setting in the end!!!!
+    	 for (int i = 0; i < m_prevRps->GetNumberOfRawGroups(); i++)
+    	 {
+
+    	 }
+
+    	 m_criticalStations.clear();
+    	 m_aidList.clear();
+
      }
+     /*else if (!m_t_succ.empty() && m_prevRps)
+     {
+    	 //not initial, there was a non-empty RPS in the previous beacon and successful receptions
+    	 // see if some STAs actually didn't have successfull transmissions, in that case is the previous else if but for a STA
+
+     }*/
      currentId++; //beaconInterval counter
      /*
      //
@@ -1348,6 +1469,19 @@ S1gRawCtr::configureRAW ( )
     //printf("rpslist.rpsset.size is %u\n",  rpslist.rpsset.size());
 
     //delete m_rps;
+}
+
+SensorActuator *
+S1gRawCtr::LookupCriticalSta (uint16_t aid)
+{
+	for (CriticalStationsCI it = m_criticalStations.begin(); it != m_criticalStations.end(); it++)
+	{
+		if (aid == (*it)->GetAid ())
+		{
+			return (*it);
+		}
+	}
+	return nullptr;
 }
 
 //what if lookup fails, is it possibile?
