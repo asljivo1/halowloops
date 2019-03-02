@@ -41,6 +41,10 @@
 #include "wifi-mac-queue.h"
 #include <map>
 #include "s1g-raw-control.h"
+#include <fstream>
+#include <iostream>
+#include <stdio.h>
+#include <algorithm>
 
 namespace ns3 {
 
@@ -54,97 +58,97 @@ TypeId ApWifiMac::GetTypeId(void) {
 	static TypeId tid =
 			TypeId("ns3::ApWifiMac").SetParent<RegularWifiMac>().SetGroupName(
 					"Wifi").AddConstructor<ApWifiMac>().AddAttribute(
-					"BeaconInterval", "Delay between two beacons",
-					TimeValue(MicroSeconds(102400)),
-					MakeTimeAccessor(&ApWifiMac::GetBeaconInterval,
-							&ApWifiMac::SetBeaconInterval), MakeTimeChecker()).AddAttribute(
-					"BeaconJitter",
-					"A uniform random variable to cause the initial beacon starting time (after simulation time 0) "
-							"to be distributed between 0 and the BeaconInterval.",
-					StringValue("ns3::UniformRandomVariable"),
-					MakePointerAccessor(&ApWifiMac::m_beaconJitter),
-					MakePointerChecker<UniformRandomVariable>()).AddAttribute(
-					"Outputpath",
-					"output path to store info of sensors and offload stations",
-					StringValue("stationfile"),
-					MakeStringAccessor(&ApWifiMac::m_outputpath),
-					MakeStringChecker()).AddAttribute("EnableBeaconJitter",
-					"If beacons are enabled, whether to jitter the initial send event.",
-					BooleanValue(false),
-					MakeBooleanAccessor(&ApWifiMac::m_enableBeaconJitter),
-					MakeBooleanChecker()).AddAttribute("BeaconGeneration",
-					"Whether or not beacons are generated.", BooleanValue(true),
-					MakeBooleanAccessor(&ApWifiMac::SetBeaconGeneration,
-							&ApWifiMac::GetBeaconGeneration),
-					MakeBooleanChecker()).AddAttribute("ChannelWidth",
-					"Channel width of the stations ", UintegerValue(0),
-					MakeUintegerAccessor(&ApWifiMac::GetChannelWidth,
-							&ApWifiMac::SetChannelWidth),
-					MakeUintegerChecker<uint32_t>()).AddAttribute(
-					"NRawGroupStas", "Number of stations in one Raw Group",
-					UintegerValue(6000),
-					MakeUintegerAccessor(&ApWifiMac::GetRawGroupInterval,
-							&ApWifiMac::SetRawGroupInterval),
-					MakeUintegerChecker<uint32_t>()).AddAttribute(
-					"NRawStations", "Number of total stations support RAW",
-					UintegerValue(100),
-					MakeUintegerAccessor(&ApWifiMac::GetTotalStaNum,
-							&ApWifiMac::SetTotalStaNum),
-					MakeUintegerChecker<uint32_t>()).AddAttribute("SlotFormat",
-					"Slot format", UintegerValue(1),
-					MakeUintegerAccessor(&ApWifiMac::GetSlotFormat,
-							&ApWifiMac::SetSlotFormat),
-					MakeUintegerChecker<uint32_t>()).AddAttribute(
-					"SlotCrossBoundary", "cross slot boundary or not",
-					UintegerValue(1),
-					MakeUintegerAccessor(&ApWifiMac::GetSlotCrossBoundary,
-							&ApWifiMac::SetSlotCrossBoundary),
-					MakeUintegerChecker<uint32_t>()).AddAttribute(
-					"SlotDurationCount", "slot duration count",
-					UintegerValue(1000),
-					MakeUintegerAccessor(&ApWifiMac::GetSlotDurationCount,
-							&ApWifiMac::SetSlotDurationCount),
-					MakeUintegerChecker<uint32_t>()).AddAttribute("SlotNum",
-					"Number of slot", UintegerValue(2),
-					MakeUintegerAccessor(&ApWifiMac::GetSlotNum,
-							&ApWifiMac::SetSlotNum),
-					MakeUintegerChecker<uint32_t>()).AddAttribute("RPSsetup",
-					"configuration of RAW", RPSVectorValue(),
-					MakeRPSVectorAccessor(&ApWifiMac::m_rpsset),
-					MakeRPSVectorChecker()).AddTraceSource(
-					"S1gBeaconBroadcasted",
-					"Fired when a beacon is transmitted",
-					MakeTraceSourceAccessor(&ApWifiMac::m_transmitBeaconTrace),
-					"ns3::ApWifiMac::S1gBeaconTracedCallback").AddTraceSource(
-					"RpsIndex", "Fired when RPS index changes",
-					MakeTraceSourceAccessor(&ApWifiMac::m_rpsIndexTrace),
-					"ns3::TracedValueCallback::Uint16").AddTraceSource(
-					"RawGroup", "Fired when RAW group index changes",
-					MakeTraceSourceAccessor(&ApWifiMac::m_rawGroupTrace),
-					"ns3::TracedValueCallback::Uint8").AddTraceSource("RawSlot",
-					"Fired when RAW slot index changes",
-					MakeTraceSourceAccessor(&ApWifiMac::m_rawSlotTrace),
-					"ns3::TracedValueCallback::Uint8")
-			/*.AddTraceSource("RAWSlotStarted",
+							"BeaconInterval", "Delay between two beacons",
+							TimeValue(MicroSeconds(102400)),
+							MakeTimeAccessor(&ApWifiMac::GetBeaconInterval,
+									&ApWifiMac::SetBeaconInterval), MakeTimeChecker()).AddAttribute(
+											"BeaconJitter",
+											"A uniform random variable to cause the initial beacon starting time (after simulation time 0) "
+											"to be distributed between 0 and the BeaconInterval.",
+											StringValue("ns3::UniformRandomVariable"),
+											MakePointerAccessor(&ApWifiMac::m_beaconJitter),
+											MakePointerChecker<UniformRandomVariable>()).AddAttribute(
+													"Outputpath",
+													"output path to store info of sensors and offload stations",
+													StringValue("stationfile"),
+													MakeStringAccessor(&ApWifiMac::m_outputpath),
+													MakeStringChecker()).AddAttribute("EnableBeaconJitter",
+															"If beacons are enabled, whether to jitter the initial send event.",
+															BooleanValue(false),
+															MakeBooleanAccessor(&ApWifiMac::m_enableBeaconJitter),
+															MakeBooleanChecker()).AddAttribute("BeaconGeneration",
+																	"Whether or not beacons are generated.", BooleanValue(true),
+																	MakeBooleanAccessor(&ApWifiMac::SetBeaconGeneration,
+																			&ApWifiMac::GetBeaconGeneration),
+																			MakeBooleanChecker()).AddAttribute("ChannelWidth",
+																					"Channel width of the stations ", UintegerValue(0),
+																					MakeUintegerAccessor(&ApWifiMac::GetChannelWidth,
+																							&ApWifiMac::SetChannelWidth),
+																							MakeUintegerChecker<uint32_t>()).AddAttribute(
+																									"NRawGroupStas", "Number of stations in one Raw Group",
+																									UintegerValue(6000),
+																									MakeUintegerAccessor(&ApWifiMac::GetRawGroupInterval,
+																											&ApWifiMac::SetRawGroupInterval),
+																											MakeUintegerChecker<uint32_t>()).AddAttribute(
+																													"NRawStations", "Number of total stations support RAW",
+																													UintegerValue(100),
+																													MakeUintegerAccessor(&ApWifiMac::GetTotalStaNum,
+																															&ApWifiMac::SetTotalStaNum),
+																															MakeUintegerChecker<uint32_t>()).AddAttribute("SlotFormat",
+																																	"Slot format", UintegerValue(1),
+																																	MakeUintegerAccessor(&ApWifiMac::GetSlotFormat,
+																																			&ApWifiMac::SetSlotFormat),
+																																			MakeUintegerChecker<uint32_t>()).AddAttribute(
+																																					"SlotCrossBoundary", "cross slot boundary or not",
+																																					UintegerValue(1),
+																																					MakeUintegerAccessor(&ApWifiMac::GetSlotCrossBoundary,
+																																							&ApWifiMac::SetSlotCrossBoundary),
+																																							MakeUintegerChecker<uint32_t>()).AddAttribute(
+																																									"SlotDurationCount", "slot duration count",
+																																									UintegerValue(1000),
+																																									MakeUintegerAccessor(&ApWifiMac::GetSlotDurationCount,
+																																											&ApWifiMac::SetSlotDurationCount),
+																																											MakeUintegerChecker<uint32_t>()).AddAttribute("SlotNum",
+																																													"Number of slot", UintegerValue(2),
+																																													MakeUintegerAccessor(&ApWifiMac::GetSlotNum,
+																																															&ApWifiMac::SetSlotNum),
+																																															MakeUintegerChecker<uint32_t>()).AddAttribute("RPSsetup",
+																																																	"configuration of RAW", RPSVectorValue(),
+																																																	MakeRPSVectorAccessor(&ApWifiMac::m_rpsset),
+																																																	MakeRPSVectorChecker()).AddTraceSource(
+																																																			"S1gBeaconBroadcasted",
+																																																			"Fired when a beacon is transmitted",
+																																																			MakeTraceSourceAccessor(&ApWifiMac::m_transmitBeaconTrace),
+																																																			"ns3::ApWifiMac::S1gBeaconTracedCallback").AddTraceSource(
+																																																					"RpsIndex", "Fired when RPS index changes",
+																																																					MakeTraceSourceAccessor(&ApWifiMac::m_rpsIndexTrace),
+																																																					"ns3::TracedValueCallback::Uint16").AddTraceSource(
+																																																							"RawGroup", "Fired when RAW group index changes",
+																																																							MakeTraceSourceAccessor(&ApWifiMac::m_rawGroupTrace),
+																																																							"ns3::TracedValueCallback::Uint8").AddTraceSource("RawSlot",
+																																																									"Fired when RAW slot index changes",
+																																																									MakeTraceSourceAccessor(&ApWifiMac::m_rawSlotTrace),
+																																																									"ns3::TracedValueCallback::Uint8")
+																																																									/*.AddTraceSource("RAWSlotStarted",
 			 "Fired when a RAW slot has started",
 			 MakeTraceSourceAccessor(&ApWifiMac::m_rawSlotStarted),
 			 "ns3::S1gApWifiMac::RawSlotStartedCallback")*/
-			.AddTraceSource("PacketToTransmitReceivedFromUpperLayer",
-					"Fired when packet is received from the upper layer",
-					MakeTraceSourceAccessor(
-							&ApWifiMac::m_packetToTransmitReceivedFromUpperLayer),
-					"ns3::S1gApWifiMac::PacketToTransmitReceivedFromUpperLayerCallback").AddAttribute(
-					"PageSliceSet", "configuration of PageSlice",
-					pageSliceValue(),
-					MakepageSliceAccessor(&ApWifiMac::m_pageslice),
-					MakepageSliceChecker()).AddAttribute("PageSlicingActivated",
-					"Whether or not page slicing is activated.",
-					BooleanValue(true),
-					MakeBooleanAccessor(&ApWifiMac::SetPageSlicingActivated,
-							&ApWifiMac::GetPageSlicingActivated),
-					MakeBooleanChecker()).AddAttribute("TIMSet",
-					"configuration of TIM", TIMValue(),
-					MakeTIMAccessor(&ApWifiMac::m_TIM), MakeTIMChecker());
+																																																									.AddTraceSource("PacketToTransmitReceivedFromUpperLayer",
+																																																											"Fired when packet is received from the upper layer",
+																																																											MakeTraceSourceAccessor(
+																																																													&ApWifiMac::m_packetToTransmitReceivedFromUpperLayer),
+																																																													"ns3::S1gApWifiMac::PacketToTransmitReceivedFromUpperLayerCallback").AddAttribute(
+																																																															"PageSliceSet", "configuration of PageSlice",
+																																																															pageSliceValue(),
+																																																															MakepageSliceAccessor(&ApWifiMac::m_pageslice),
+																																																															MakepageSliceChecker()).AddAttribute("PageSlicingActivated",
+																																																																	"Whether or not page slicing is activated.",
+																																																																	BooleanValue(true),
+																																																																	MakeBooleanAccessor(&ApWifiMac::SetPageSlicingActivated,
+																																																																			&ApWifiMac::GetPageSlicingActivated),
+																																																																			MakeBooleanChecker()).AddAttribute("TIMSet",
+																																																																					"configuration of TIM", TIMValue(),
+																																																																					MakeTIMAccessor(&ApWifiMac::m_TIM), MakeTIMChecker());
 	/*
 	 .AddAttribute ("DTIMPeriod", "TIM number in one of DTIM",
 	 UintegerValue (4),
@@ -278,7 +282,7 @@ void ApWifiMac::SetWifiRemoteStationManager(
 	NS_LOG_FUNCTION(this << stationManager);
 	m_beaconDca->SetWifiRemoteStationManager(stationManager);
 	for (uint32_t i = 0; i < m_rawSlotsDca.size(); i++) //auto& p : m_rawSlotsDca
-			{
+	{
 		m_rawSlotsDca[i]->SetWifiRemoteStationManager(stationManager);
 		for (EdcaQueues::iterator it = m_rawSlotsEdca[i].begin();
 				it != m_rawSlotsEdca[i].end(); ++it) {
@@ -490,11 +494,12 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 				else
 				{
 					m_rawSlotsEdca[GetAllSlotNumbersFromAid(aid)[0]][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
+					this->m_enqueuedToAids.push_back(aid);
 				}
 			}
 		}
 		//else enqueue after it is paged (next DTIM)
-
+		NS_LOG_UNCOND ("AP m_enqueuedToAids.size=" << m_enqueuedToAids.size());
 	} else {
 		// queue the packet in the specific raw slot period DCA
 		m_rawSlotsDca[GetNextSlotNumFromAid(aid)]->Queue(packet, hdr);
@@ -664,7 +669,7 @@ uint32_t ApWifiMac::GetNextSlotNumFromAid(uint16_t aid) const {
 				myslot += ass.GetSlotNum();
 		}
 		//if (found)
-			//break;
+		//break;
 	}
 	uint32_t currentSlot = this->GetSlotNumFromRpsRawSlot(m_rpsIndexTrace, m_rawGroupTrace, m_rawSlotTrace);
 	bool found = false;
@@ -674,7 +679,7 @@ uint32_t ApWifiMac::GetNextSlotNumFromAid(uint16_t aid) const {
 		{
 			//schedule downlink to the first next slot STA is assigned to
 			if (aid==1)
-			std::cout << "  " << targetslot;
+				std::cout << "  " << targetslot;
 			myslot = targetslot;
 			found = true;
 			break;
@@ -767,7 +772,7 @@ Time ApWifiMac::GetSlotStartTimeFromAid(uint16_t aid) const {
 			uint16_t statRawSlot = (aid & 0x03ff) % slotNum;
 			Time start = MicroSeconds(
 					(500 + slotDurationCount * 120) * statRawSlot
-							+ currentRAW_start);
+					+ currentRAW_start);
 			NS_LOG_DEBUG(
 					"[aid=" << aid << "] is located in RAW " << (int)raw_index + 1 << " in slot " << statRawSlot + 1 << ". RAW slot start time relative to the beacon = " << start.GetMicroSeconds() << " us.");
 			x = 1;
@@ -880,8 +885,8 @@ void ApWifiMac::Enqueue(Ptr<const Packet> packet, Mac48Address to, Mac48Address 
 		{
 
 		}
-		*/
-			ForwardDown(packet, from, to);
+		 */
+		ForwardDown(packet, from, to);
 
 	}
 }
@@ -924,7 +929,7 @@ SupportedRates ApWifiMac::GetSupportedRates(void) const {
 		if (mode.IsMandatory()
 				&& ((mode.GetModulationClass() != WIFI_MOD_CLASS_DSSS)
 						|| mode == WifiPhy::GetDsssRate1Mbps()
-						|| mode == WifiPhy::GetDsssRate2Mbps())) {
+		|| mode == WifiPhy::GetDsssRate2Mbps())) {
 			m_stationManager->AddBasicMode(mode);
 		}
 	}
@@ -1123,10 +1128,10 @@ uint8_t ApWifiMac::HasPacketsToBlock(uint16_t blockInd, uint16_t PageInd) {
 	block = (PageInd << 11) | (blockInd << 6); // TODO check
 
 	for (uint16_t i = 0; i <= 7; i++) //8 subblock in each block.
-			{
+	{
 		subblock = block | (i << 3);
 		for (uint16_t j = 0; j <= 7; j++) //8 stations in each subblock
-				{
+		{
 			sta_aid = subblock | j;
 			if (m_stationManager->IsAssociated(
 					m_AidToMacAddr.find(sta_aid)->second)) {
@@ -1156,7 +1161,7 @@ uint8_t ApWifiMac::HasPacketsToSubBlock(uint16_t subblockInd, uint16_t blockInd,
 
 	subblock = (PageInd << 11) | (blockInd << 6) | (subblockInd << 3);
 	for (uint16_t j = 0; j <= 7; j++) //8 stations in each subblock
-			{
+	{
 		sta_aid = subblock | j;
 		if (m_stationManager->IsAssociated(
 				m_AidToMacAddr.find(sta_aid)->second)) {
@@ -1173,7 +1178,7 @@ bool ApWifiMac::HasPacketsInQueueTo(Mac48Address dest) {
 	NS_LOG_FUNCTION(this);
 	//check also if ack received
 	Ptr<const Packet> peekedPacket_VO, peekedPacket_VI, peekedPacket_BE,
-			peekedPacket_BK;
+	peekedPacket_BK;
 	WifiMacHeader peekedHdr;
 	Time tstamp;
 
@@ -1262,6 +1267,12 @@ void ApWifiMac::SetaccessList(std::map<Mac48Address, bool> list) {
 	 m_edca.find (AC_BK)->second->SetaccessList (list);*/
 }
 
+template <typename T>
+void delete_pointed_to (T* const ptr)
+{
+	delete ptr;
+}
+
 void ApWifiMac::SendOneBeacon(void) {
 	NS_LOG_FUNCTION(this);
 	WifiMacHeader hdr;
@@ -1278,208 +1289,99 @@ void ApWifiMac::SendOneBeacon(void) {
 		S1gBeaconCompatibility compatibility;
 		compatibility.SetBeaconInterval(m_beaconInterval.GetMicroSeconds());
 		beacon.SetBeaconCompatibility(compatibility);
-		/*NS_LOG_UNCOND ("+++++++++++++++++++INIT m_enqueuedToAids size= " << m_enqueuedToAids.size());
-		for (auto aid : m_enqueuedToAids)
-		{
-			NS_LOG_UNCOND( ", " << (int)aid);
-		}
 
-		NS_LOG_UNCOND ("\n +++++++++++++++++++INIT m_sentToAids size=" << m_sentToAids.size());
-		for (auto aid : m_sentToAids)
-		{
-			NS_LOG_UNCOND( ", " << (int)aid);
-		}
-		NS_LOG_UNCOND ("\n +++++++++++++++++++m_offloadAids");
-		for (auto aid : m_offloadAids)
-		{
-			NS_LOG_UNCOND(", " << (int)aid);
-		}*/
-		RPS *m_rps;
-		m_updateRps = true;
-		if (m_updateRps)
-		{
-			m_updateRps = false;
+		std::string path = "./OptimalRawGroup/results-coap/loops-optimal-";
 
-			//RPS* newRps = new RPS;
-			std::string path = "./OptimalRawGroup/results-coap/loops-optimal-";
+		auto it=this->m_enqueuedToAids.begin();
+		while ( it != m_enqueuedToAids.end())
+		{
+			//NS_LOG_UNCOND ("dst aid=" << *it);
+			std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (*it);
+			auto dest = this->m_AidToMacAddr.find(*it)->second;
+			bool stillEnqueued = false;
 
-			auto it=this->m_enqueuedToAids.begin();
-			while ( it != m_enqueuedToAids.end())
+			for (auto targetSlot : allTargetSlots)
 			{
-				NS_LOG_UNCOND ("dst aid=" << *it);
-				std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (*it);
-				auto dest = this->m_AidToMacAddr.find(*it)->second;
-				bool stillEnqueued = false;
-
-				for (auto targetSlot : allTargetSlots)
+				auto peekedPacket_VO =
+						m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(
+								WifiMacHeader::ADDR1, dest);
+				auto peekedPacket_VI =
+						m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(
+								WifiMacHeader::ADDR1, dest);
+				auto peekedPacket_BE =
+						m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(
+								WifiMacHeader::ADDR1, dest);
+				auto peekedPacket_BK =
+						m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(
+								WifiMacHeader::ADDR1, dest);
+				if (peekedPacket_VO != 0 || peekedPacket_VI != 0 || peekedPacket_BE != 0 || peekedPacket_BK != 0)
 				{
-					auto peekedPacket_VO =
-							m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(
-									WifiMacHeader::ADDR1, dest);
-					auto peekedPacket_VI =
-							m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(
-									WifiMacHeader::ADDR1, dest);
-					auto peekedPacket_BE =
-							m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(
-									WifiMacHeader::ADDR1, dest);
-					auto peekedPacket_BK =
-							m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(
-									WifiMacHeader::ADDR1, dest);
-					if (peekedPacket_VO != 0 || peekedPacket_VI != 0 || peekedPacket_BE != 0 || peekedPacket_BK != 0)
+					//AP might have delivered packets in this slot and also enqueued others to the same next slot
+					int qlen = this->m_rawSlotsEdca[targetSlot].size() / 4;
+					if (m_enqueuedToAids.size() - qlen > 0)
 					{
-						//AP might have delivered packets in this slot and also enqueued others to the same next slot
-						int qlen = this->m_rawSlotsEdca[targetSlot].size() / 4;
-						if (m_enqueuedToAids.size() - qlen > 0)
-						{
-							//NS_LOG_UNCOND ("***nonempty targetslot=" << targetSlot <<" ,also in this target slot delivered num=" << m_enqueuedToAids.size() - qlen);
-							/*this->m_sentToAids.push_back(*it);
+						//NS_LOG_UNCOND ("***nonempty targetslot=" << targetSlot <<" ,also in this target slot delivered num=" << m_enqueuedToAids.size() - qlen);
+						/*this->m_sentToAids.push_back(*it);
 							it = m_enqueuedToAids.erase(it);*/
-						}
-						else
-						{
-							//NS_LOG_UNCOND ("---packet for dest= " << dest <<" nonempty targetslot=" << targetSlot <<" size= " << qlen);
-							stillEnqueued = true;
-							break;
-						}
+					}
+					else
+					{
+						stillEnqueued = true;
+						break;
 					}
 				}
-				if (stillEnqueued)
+			}
+			if (stillEnqueued)
+			{
+				++it;
+			}
+			else
+			{
+				this->m_sentToAids.push_back(*it);
+				it = m_enqueuedToAids.erase(it);
+			}
+		}
+
+		if (this->m_criticalAids.size())
+		{
+			RPS rps;
+			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
+			int i = 0;
+			while (i < m_rpsset.rpsset.at(0)->GetNumberOfRawGroups())
+			{
+				if (rps.GetNumberOfRawGroups() > i)
 				{
-					//NS_LOG_UNCOND ("STILL IN QUEUE");
-					++it;
+					m_rpsset.rpsset.at(0)->ReplaceRawAssignmentAt(rps.GetRawAssigmentObj(i), i);
 				}
 				else
 				{
-					//NS_LOG_UNCOND ("NOT IN QUEUE");
-					this->m_sentToAids.push_back(*it);
-					it = m_enqueuedToAids.erase(it);
-					//this->m_enqueuedToAids.erase(it++);
+					m_rpsset.rpsset.at(0)->DeleteRawAssigmentObj(i);
+					i--;
 				}
+				NS_LOG_UNCOND ("i=" << i);
+				i++;
+
 			}
-			/*NS_LOG_UNCOND ("+++++++++++++++++++later m_enqueuedToAids");
-			for (auto aid : m_enqueuedToAids)
-			{
-				NS_LOG_UNCOND( ", " << (int)aid);
-			}
-
-			NS_LOG_UNCOND ("\n +++++++++++++++++++later m_sentToAids");
-			for (auto aid : m_sentToAids)
-			{
-				NS_LOG_UNCOND( ", " << (int)aid);
-			}*/
-			if (this->m_rpsset.rpsset.size())
-				m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
-			else
-				m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), NULL, this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
-
-
-			/*for (auto& rps : m_rpsset.rpsset) {
-				//Assumption 1: First RAW is always loop-RAW and all loop-RAWs have the same duration
-				Time loopSlotDurationTotal = 2 * m_loopAids.size()
-								* rps->GetRawAssigmentObj(0).GetSlotDuration();
-
-				//Assumption 2: In intial RAW setup, all sensors are in a single RAW
-				Time remainingTime = m_beaconInterval - loopSlotDurationTotal
-						- MicroSeconds(5600);
-				NS_ASSERT(remainingTime > Time());
-
-				// finds number of slots total in sensors' RAWs
-				uint16_t numSlots = 0;
-				for (uint32_t g = 0; g < rps->GetNumberOfRawGroups(); g++) {
-					auto rawg = rps->GetRawAssigmentObj(g);
-					if (rawg.GetRawGroupAIDStart()
-							!= rawg.GetRawGroupAIDEnd()) {
-						numSlots += rawg.GetSlotNum();
-					}
-				}
-				uint16_t sensorCount = (remainingTime.GetMicroSeconds()
-						/ numSlots - 500) / 120;
-				RPS::RawAssignment *newRaw = new RPS::RawAssignment;
-				newRaw->SetRawControl(
-						rps->GetRawAssigmentObj(0).GetRawControl());
-				newRaw->SetSlotCrossBoundary(
-						rps->GetRawAssigmentObj(0).GetSlotCrossBoundary());
-				newRaw->SetSlotFormat(
-						rps->GetRawAssigmentObj(0).GetSlotFormat());
-				uint32_t sensor_aid_start =
-						rps->GetRawAssigmentObj(1).GetRawGroupAIDStart();
-				uint32_t sensor_aid_end =
-						rps->GetRawAssigmentObj(1).GetRawGroupAIDEnd();
-				uint32_t numSensors = sensor_aid_end - sensor_aid_start + 1;
-				for (uint32_t t = 0; t < 2; t++) {
-					// loops
-					for (std::vector<uint32_t>& aidVec : m_loopAids) {
-						newRaw->SetSlotDurationCount(
-								rps->GetRawAssigmentObj(0).GetSlotDurationCount()); //in initial RAW config 0th was loop
-						newRaw->SetSlotNum(1);
-						uint32_t page =
-								rps->GetRawAssigmentObj(0).GetRawGroupPage();
-						uint32_t aid_start = aidVec[t];
-						uint32_t aid_end = aidVec[t];
-						uint32_t rawinfo = (aid_end << 13) | (aid_start << 2)
-								| page;
-						newRaw->SetRawGroup(rawinfo);
-
-						std::cout << "*** Loop aid: " << aid_start << "-"
-								<< aid_end << std::endl;
-					}
-
-					// sensors
-					newRaw->SetSlotDurationCount(sensorCount);
-					uint16_t ns = numSlots > 1 ? numSlots / 2 : numSlots;
-					if (numSlots % 2 != 0 && numSlots > 1 && t > 0)
-						ns++;
-					newRaw->SetSlotNum(ns);
-					uint32_t page =
-							rps->GetRawAssigmentObj(0).GetRawGroupPage();
-					uint32_t aid_start =
-							t == 0 ? sensor_aid_start : numSensors / 2 + 1;
-					uint32_t aid_end = t == 0 ? numSensors / 2 : sensor_aid_end;
-					uint32_t rawinfo = (aid_end << 13) | (aid_start << 2)
-							| page;
-					newRaw->SetRawGroup(rawinfo);
-					std::cout << "*** Sensor aid: " << aid_start << "-"
-							<< aid_end << std::endl;
-					std::cout << "         count= " << (int) sensorCount
-							<< ", numslots=" << ns << std::endl;
-					newRps->SetRawAssignment(*newRaw);
-				}
-				delete newRaw;
-			}
-			//std::cout << "PRIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;
-			uint32_t loopCount =
-					m_rpsset.rpsset.at(0)->GetRawAssigmentObj(0).GetSlotDurationCount();
-			m_rpsset.rpsset.clear();
-			m_rpsset.rpsset.push_back(newRps);
-			//delete newRps;
-			//std::cout << "POSLIJE m_rpsset.rpsset.size()=" << m_rpsset.rpsset.size() << std::endl;*/
 		}
-		/*for (auto& rps : m_rpsset.rpsset)
-		 {
-		 for (int i=0; i<rps->GetNumberOfRawGroups(); i++)
-		 {
-		 std::cout << "RAW nr " << i << std::endl;
-		 std::cout << "	control=" << (int)rps->GetRawAssigmentObj(i).GetRawControl();
-		 std::cout << "	csb=" << (int)rps->GetRawAssigmentObj(i).GetSlotCrossBoundary();
-		 std::cout << "	format=" << (int)rps->GetRawAssigmentObj(i).GetSlotFormat();
-		 std::cout << "	count=" << (int)rps->GetRawAssigmentObj(i).GetSlotDurationCount();
-		 std::cout << "	numslots=" << (int)rps->GetRawAssigmentObj(i).GetSlotNum();
-		 std::cout << "	aidstart=" << (int)rps->GetRawAssigmentObj(i).GetRawGroupAIDStart();
-		 std::cout << "	aidend=" << (int)rps->GetRawAssigmentObj(i).GetRawGroupAIDEnd();
-		 std::cout << std::endl;
-		 }
-		 }*/
 
+
+		RPS *p_rps;
 		if (RpsIndex < m_rpsset.rpsset.size()) {
-			m_rps = m_rpsset.rpsset.at(RpsIndex);
+			p_rps = m_rpsset.rpsset.at(RpsIndex);
 			NS_LOG_INFO("< RpsIndex =" << RpsIndex);
 			RpsIndex++;
 		} else {
-			m_rps = m_rpsset.rpsset.at(0);
+			p_rps = m_rpsset.rpsset.at(0);
 			NS_LOG_INFO("RpsIndex =" << RpsIndex);
 			RpsIndex = 1;
 		}
-		beacon.SetRPS(*m_rps);
+		std::ofstream os;
+		std::string outputpath = "./OptimalRawGroup/results-coap/lastaddedrpstobeacon.txt";
+		os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
+		p_rps->Print(os);
+		os.close();
+		beacon.SetRPS(*p_rps);
+
 
 		Mac48Address stasleepAddr;
 		for (auto i = m_AidToMacAddr.begin(); i != m_AidToMacAddr.end(); ++i) {
@@ -1493,7 +1395,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		}
 
 		if (m_DTIMCount == 0 && GetPageSlicingActivated()) // TODO filter when GetPageSlicingActivated() is false
-				{
+		{
 			NS_LOG_DEBUG(
 					"***DTIM*** starts at " << Simulator::Now().GetSeconds() << " s");
 			m_pagebitmap = HasPacketsToPage(m_pageslice.GetBlockOffset(),
@@ -1513,7 +1415,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		m_TIM.SetDTIMCount(m_DTIMCount);
 		NS_ASSERT(
 				m_pageslice.GetTIMOffset() + m_pageslice.GetPageSliceCount()
-						<= m_DTIMPeriod);
+				<= m_DTIMPeriod);
 		m_TrafficIndicator = 0; //for group addressed MSDU/MMPDU, not supported.
 		m_TIM.SetTafficIndicator(m_TrafficIndicator); //from page slice
 
@@ -1522,7 +1424,7 @@ void ApWifiMac::SendOneBeacon(void) {
 			m_PageSliceNum = 31;
 		} else {
 			if (m_DTIMCount == m_pageslice.GetTIMOffset()) //first page slice start at TIM offset
-					{
+			{
 				m_PageSliceNum = 0;
 			} else {
 				m_PageSliceNum++;
@@ -1565,16 +1467,16 @@ void ApWifiMac::SendOneBeacon(void) {
 		uint8_t NumEncodedBlock;
 		if (m_PageSliceNum != (m_pageslice.GetPageSliceCount() - 1)
 				&& m_PageSliceNum != 31) // convenient overflow if count==0
-						{
+		{
 			NumEncodedBlock = m_pageslice.GetPageSliceLen();
 		} else if (m_pageslice.GetPageBitmapLength() > 0) //Last Page slice has max value of 31 (5 bits)
-				{
+		{
 			// PSlast = 8 * PageBitmap_length - (PScount-1) * PSlength
 			if (m_pageslice.GetPageSliceCount() > 0)
 				NumEncodedBlock = 0x1f
-						& (8 * 4
-								- (m_pageslice.GetPageSliceCount() - 1)
-										* m_pageslice.GetPageSliceLen());
+				& (8 * 4
+						- (m_pageslice.GetPageSliceCount() - 1)
+						* m_pageslice.GetPageSliceLen());
 			else if (m_pageslice.GetPageSliceCount() == 0)
 				NumEncodedBlock = 31;
 			//As page bitmap of page slice element is fixed to 4 bytes for now, "m_pageslice.GetInformationFieldSize ()" is alwawys 8.
@@ -1603,7 +1505,7 @@ void ApWifiMac::SendOneBeacon(void) {
 				uint8_t * m_subblock;
 				m_subblock = new uint8_t[8]; //can be released after SetPartialVBitmap
 				for (uint16_t j = 0; j <= 7; j++) // at most 8 subblock
-						{
+				{
 					if (m_blockbitmap & (1 << j)) {
 						*m_subblock = HasPacketsToSubBlock(j,
 								m_blockoffset & 0x1f, m_PageIndex);
@@ -1618,9 +1520,9 @@ void ApWifiMac::SendOneBeacon(void) {
 				m_blockoffset++; //actually block id
 				NS_ASSERT(
 						m_blockoffset
-								<= m_pageslice.GetBlockOffset()
-										+ m_pageslice.GetInformationFieldSize()
-												* 8);
+						<= m_pageslice.GetBlockOffset()
+						+ m_pageslice.GetInformationFieldSize()
+						* 8);
 				//block id cannot exceeds the max defined in the page slice  element
 				m_TIM.SetPartialVBitmap(*m_encodedBlock);
 				if (m_encodedBlock)
@@ -1644,20 +1546,6 @@ void ApWifiMac::SendOneBeacon(void) {
 		} else {
 			m_DTIMCount++;
 		}
-		//NS_ASSERT (m_DTIMPeriod - m_DTIMCount + m_DTIMOffset == m_DTIMPeriod || (m_DTIMCount == 0 && m_DTIMOffset == 0));
-
-		//set sleep list, temporary, removed if ps-poll supported
-
-		/*for (auto &it : m_rawSlotsEdca) {
-			it.find(AC_VO)->second->SetsleepList(m_sleepList);
-			it.find(AC_VI)->second->SetsleepList(m_sleepList);
-			it.find(AC_BE)->second->SetsleepList(m_sleepList);
-			it.find(AC_BK)->second->SetsleepList(m_sleepList);
-		}*/
-		/*m_edca.find (AC_VO)->second->SetsleepList (m_sleepList);
-		 m_edca.find (AC_VI)->second->SetsleepList (m_sleepList);
-		 m_edca.find (AC_BE)->second->SetsleepList (m_sleepList);
-		 m_edca.find (AC_BK)->second->SetsleepList (m_sleepList);*/
 
 		AuthenticationCtrl AuthenCtrl;
 		AuthenCtrl.SetControlType(false); //centralized
@@ -1677,7 +1565,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		packet->AddHeader(beacon);
 		m_beaconDca->Queue(packet, hdr);
 
-		m_transmitBeaconTrace(beacon, m_rps->GetRawAssigmentObj());
+		m_transmitBeaconTrace(beacon, p_rps->GetRawAssigmentObj());
 
 		MacLowTransmissionParameters params;
 		params.DisableRts();
@@ -1693,17 +1581,16 @@ void ApWifiMac::SendOneBeacon(void) {
 		m_rawSlotsEdca[0].find(AC_VO)->second->SetRawSlotDuration(
 				m_sharedSlotDuration + m_bufferTimeToAllowBeaconToBeReceived);
 
-		auto nRaw = m_rps->GetNumberOfRawGroups();
+		uint8_t nRaw;
+		nRaw = p_rps->GetNumberOfRawGroups();
+
 		currentRawGroup = (currentRawGroup + 1) % nRaw;
 
 		uint16_t startaid;
 		uint16_t endaid;
 		Mac48Address stasAddr;
-		//uint16_t offset;
 		uint16_t statsPerSlot;
 		uint16_t statRawSlot;
-
-		//NS_LOG_UNCOND ("ap send beacon at " << Simulator::Now ());
 
 		m_accessList.clear();
 		for (uint16_t i = 1; i <= m_totalStaNum; i++) {
@@ -1718,33 +1605,35 @@ void ApWifiMac::SendOneBeacon(void) {
 				m_accessList[stasAddr] = false;
 			}
 		}
-		//NS_LOG_UNCOND ("m_accessList.size " << m_accessList.size ());
 
 		// schedule the slot start
 		Time timeToSlotStart = Time();
-		for (uint32_t g = 0; g < nRaw; g++) {
-			if (m_AidToMacAddr.size() == 0) {
+		for (uint32_t g = 0; g < nRaw; g++)
+		{
+			if (m_AidToMacAddr.size() == 0)
+			{
 				break;
 			}
+			uint16_t slotnum;
 
-			startaid = m_rps->GetRawAssigmentObj(g).GetRawGroupAIDStart();
-			endaid = m_rps->GetRawAssigmentObj(g).GetRawGroupAIDEnd();
+			startaid = p_rps->GetRawAssigmentObj(g).GetRawGroupAIDStart();
+			endaid = p_rps->GetRawAssigmentObj(g).GetRawGroupAIDEnd();
+			//statsPerSlot = (endaid - startaid + 1) / p_rps->GetRawAssigmentObj(g).GetSlotNum();
+			slotnum = p_rps->GetRawAssigmentObj(g).GetSlotNum();
 
-			//offset =0; // for test
-			//m_slotNum=m_rps->GetRawAssigmentObj(g).GetSlotNum();
-			statsPerSlot = (endaid - startaid + 1)
-					/ m_rps->GetRawAssigmentObj(g).GetSlotNum();
 
-			for (uint32_t i = 0; i < m_rps->GetRawAssigmentObj(g).GetSlotNum();
-					i++) {
-				for (uint32_t k = startaid; k <= endaid; k++) {
+			for (uint32_t i = 0; i < slotnum; i++)
+			{
+				for (uint32_t k = startaid; k <= endaid; k++)
+				{
 
-					statRawSlot = (k & 0x03ff)
-							% m_rps->GetRawAssigmentObj(g).GetSlotNum(); //slot that the station k will be
-							// station is in sot i
-					if (statRawSlot == i) {
+					statRawSlot = (k & 0x03ff) % slotnum; //slot that the station k will be
+					// station is in sot i
+					if (statRawSlot == i)
+					{
 						stasAddr = m_AidToMacAddr.find(k)->second;
-						if (m_stationManager->IsAssociated(stasAddr)) {
+						if (m_stationManager->IsAssociated(stasAddr))
+						{
 							m_accessList[stasAddr] = true;
 						}
 					}
@@ -1752,39 +1641,42 @@ void ApWifiMac::SendOneBeacon(void) {
 				}
 				Simulator::Schedule(
 						bufferTimeToAllowBeaconToBeReceived + timeToSlotStart,
-						&ApWifiMac::SetaccessList, this, m_accessList);
+						&ApWifiMac::SetaccessList,
+						this,
+						m_accessList);
 
 				Simulator::Schedule(
 						bufferTimeToAllowBeaconToBeReceived + timeToSlotStart,
-						&ApWifiMac::OnRAWSlotStart, this, RpsIndex, g + 1,
+						&ApWifiMac::OnRAWSlotStart,
+						this,
+						RpsIndex,
+						g + 1,
 						i + 1);
 
-				Time totalTimeToRawEnd =
-						bufferTimeToAllowBeaconToBeReceived + timeToSlotStart
-								+ MicroSeconds(
-										m_rpsset.rpsset.at(RpsIndex - 1)->GetRawAssigmentObj(
-												g).GetSlotDurationCount() * 120
-												+ 500);
-				Simulator::Schedule(totalTimeToRawEnd, &ApWifiMac::OnRAWSlotEnd,
-						this, RpsIndex, g + 1, i + 1);
-				timeToSlotStart +=
-						MicroSeconds(
-								500
-										+ m_rps->GetRawAssigmentObj(g).GetSlotDurationCount()
-												* 120);
+				Time slotDuration;
+				slotDuration = m_rpsset.rpsset.at(RpsIndex - 1)->GetRawAssigmentObj(g).GetSlotDuration();
 
-				for (uint16_t i = 1; i <= m_totalStaNum; i++) {
+				Time totalTimeToRawEnd = bufferTimeToAllowBeaconToBeReceived + timeToSlotStart + slotDuration;
+				Simulator::Schedule(
+						totalTimeToRawEnd,
+						&ApWifiMac::OnRAWSlotEnd,
+						this,
+						RpsIndex,
+						g + 1,
+						i + 1);
+
+				timeToSlotStart += slotDuration;
+
+				for (uint16_t i = 1; i <= m_totalStaNum; i++)
+				{
 					stasAddr = m_AidToMacAddr.find(i)->second;
 
-					if (m_stationManager->IsAssociated(stasAddr)) {
+					if (m_stationManager->IsAssociated(stasAddr))
+					{
 						m_accessList[stasAddr] = false;
 					}
 				}
-				/*NS_LOG_UNCOND ("+++++++++++++++++++RECEIVEDDDD");
-				for (auto aid : m_receivedAid)
-				{
-					NS_LOG_UNCOND (", " << (int)aid);
-				}*/
+
 				m_receivedAid.clear();
 				m_receivedTimes.clear();
 				m_sentToAids.clear();
@@ -1845,7 +1737,7 @@ void ApWifiMac::OnRAWSlotEnd(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 					numberOfRawGroupsInThisRps - 1).GetSlotNum();
 	Time sharedSlotDuration =
 			rawGroup == numberOfRawGroupsInThisRps
-					&& slot == numOfSlotsInLastGroup ?
+			&& slot == numOfSlotsInLastGroup ?
 					GetBeaconInterval() - totalRawDuration : Time();
 
 	// for shared slot after all RAW groups, its duration is reduced for the delay of the first RAW group
@@ -1864,19 +1756,19 @@ void ApWifiMac::OnRAWSlotEnd(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 		// take csb value of the next RAW group in the same RPS
 		csb =
 				m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(rawGroup).GetSlotCrossBoundary()
-						== 0x01;
+				== 0x01;
 	} else if (rps < m_rpsset.rpsset.size()) {
 		// given that this RAW group is the last one in this RPS
 		// take csb value of the first RAW group in the next RPS
 		csb =
 				m_rpsset.rpsset.at(rps)->GetRawAssigmentObj(0).GetSlotCrossBoundary()
-						== 0x01;
+				== 0x01;
 	} else {
 		// this is the last RAW group in the last RPS
 		// take csb value of the first RAW group of the first RPS
 		csb =
 				m_rpsset.rpsset.at(0)->GetRawAssigmentObj(0).GetSlotCrossBoundary()
-						== 0x01;
+				== 0x01;
 	}
 
 	if (m_qosSupported) {
@@ -1933,7 +1825,7 @@ void ApWifiMac::OnRAWSlotStart(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 							rawGroup - 1).GetSlotDurationCount() * 120 + 500);
 	bool csb =
 			m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(rawGroup - 1).GetSlotCrossBoundary()
-					== 0x01;
+			== 0x01;
 	//std::cout << "OnRawStart Access allowed to targetSlot=" << targetSlot << ", duration=" << slotDuration.GetMicroSeconds() << " us, csb=" << csb << std::endl;
 	//std::cout << "rps=" << (int)rps-1 << ", rawGroup=" << (int)rawGroup-1 << ", slot=" << (int)slot-1 << std::endl;
 	if (m_qosSupported) {
@@ -2161,12 +2053,12 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 							auto serviceCharacteristic = aidreq.GetServiceCharacteristic();
 
 							//std::cout << "-----aidreq.GetServiceCharacteristic()=" << (int)aidreq.GetServiceCharacteristic() << std::endl;
-								SendAssocResp(hdr->GetAddr2(), true, sta_type, makeAdditionalAid, serviceCharacteristic);
+							SendAssocResp(hdr->GetAddr2(), true, sta_type, makeAdditionalAid, serviceCharacteristic);
 						}
 						else
 						{
 
-						SendAssocResp(hdr->GetAddr2(), true, sta_type, makeAdditionalAid, static_cast<AidRequest::ServiceCharacteristic>(sta_type));
+							SendAssocResp(hdr->GetAddr2(), true, sta_type, makeAdditionalAid, static_cast<AidRequest::ServiceCharacteristic>(sta_type));
 						}
 					} else {
 						//send assoc response with success status.

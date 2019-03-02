@@ -118,6 +118,9 @@ public:
 	Time m_tSuccessLast;
 	Time m_tSuccessPreLast;
 
+	uint64_t m_oldRawStart;
+	uint64_t m_newRawStart;
+
 	Time m_tInterval;
 	Time m_tIntervalMin;
 	Time m_tIntervalMax;
@@ -187,8 +190,10 @@ public:
 
   void calculateActiveOffloadSta ();
   void SetOffloadAllowedToSend ();
-  
-    
+  void AssignRawToCriticalStations (void);
+  void ControlRps (std::vector<uint16_t> criticalList);
+  void gandalf();
+  void darth();
   void calculateRawSlotDuration (uint16_t numsta, uint16_t successprob); //nedd to be extended to support more felxibility.
 
   void calculateSensorNumWantToSend (void);

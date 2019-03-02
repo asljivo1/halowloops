@@ -52,6 +52,7 @@
 #include <valarray>
 #include <stdlib.h>
 #include <math.h>
+#include <climits>
 
 namespace ns3 {
 
@@ -59,7 +60,7 @@ NS_LOG_COMPONENT_DEFINE ("S1gRawCtr");
 
 //NS_OBJECT_ENSURE_REGISTERED (S1gRawCtr);
 
-SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0)
+SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0), m_oldRawStart (INT_MAX)
 {
 
 }
@@ -291,7 +292,6 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 		}
 	}
 
-	NS_LOG_UNCOND ("receivedFromAids.size () = " << receivedFromAids.size () << ", m_criticalStations.size() = " << m_criticalStations.size() << ", currentBeacon = " << currentId);
 
 	for (std::vector<uint16_t>::iterator ci = receivedFromAids.begin(); ci != receivedFromAids.end(); ci++)
 	{
@@ -309,8 +309,9 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 		if (stationTransmit != nullptr && !match)
 		{
 			m_aidList.push_back (*ci);
-			//NS_LOG_UNCOND ("stations of aid " << *it << " received " << m_numReceived << " packets");
-
+			if (m_prevRps && m_prevRps->GetNumAssignedRaws(*ci))
+				stationTransmit->m_oldRawStart = this->m_prevRps->GetRawSlotStartFromAid(*ci);
+			//NS_LOG_UNCOND ("+++++++++aid=" << *ci <<", m_oldRawStart = " << stationTransmit->m_oldRawStart);
 			for (int i = 0; i < receivedFromAids.size(); i++)
 			{
 				if (*ci == receivedFromAids[i])
@@ -350,6 +351,8 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 			}
 		}
 	}
+	NS_LOG_UNCOND ("receivedFromAids.size () = " << receivedFromAids.size () << ", m_criticalStations.size() = " << m_criticalStations.size() << ", m_aidListPaged.size = " << this->m_aidListPaged.size() << ", currentBeacon = " << currentId);
+	NS_LOG_UNCOND ("enqueuedToAids = " << enqueuedToAids.size());
 	/*NS_LOG_UNCOND ("AID LIST:");
 	for (std::vector<uint16_t>::iterator it = m_aidList.begin(); it != m_aidList.end(); it++)
 	{
@@ -1134,9 +1137,10 @@ RPS
 S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath)
  {
      NS_ASSERT ("S1gRawCtr should not be called");
-     
+     //gandalf ();
      m_beaconInterval = BeaconInterval;
-     if (m_prevRps == nullptr)
+     //m_prevRps = prevRps;
+     if (m_prevRps == nullptr && criticalList.size())
      {
 
     	 //initial
@@ -1146,7 +1150,6 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     	 m_raw->SetRawControl(0);  //support paged STA or not
     	 m_raw->SetSlotCrossBoundary(1);
     	 m_raw->SetSlotFormat (1);
-    	 //m_raw->SetSlotNum(1);
     	 //assign RAW slots to critical STAs
 
     	 //Assumption: All critical stations have aids 1, 2, ..., N whereas sensors have aids from N+1 onwards
@@ -1173,12 +1176,12 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 m_raw->SetSlotNum(aid_end - aid_start + 1);
     				 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
     				 m_raw->SetSlotDurationCount(count);
+    				 m_rps->SetRawAssignment(*m_raw);
     			 }
     			 else
     			 {
     				 //loops are not in this tim; assign to sensors (there is no offload stations in my experiments so I am not considering them)
     				 uint16_t aid_start = currentIndex == 0 ? 1 : currentIndex * 64;
-    				 //uint16_t minaid = std::min_element(sensorList.begin(), sensorList.end());
     				 auto maxaidsensor = *std::max_element(sensorList.begin(), sensorList.end());
     				 uint16_t aid_end = maxaidsensor < (currentIndex + 1) * 64 ? maxaidsensor : (currentIndex + 1) * 64 - 1;
     				 uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | page;
@@ -1186,7 +1189,10 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 m_raw->SetSlotNum(1);
     				 uint32_t count = (m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds() - 500) / 120;
     				 m_raw->SetSlotDurationCount(count);
+    				 m_rps->SetRawAssignment(*m_raw);
     			 }
+
+
     		 }
     		 else
     		 {
@@ -1229,17 +1235,18 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 m_raw->SetSlotNum(1);
     				 m_rps->SetRawAssignment(*m_raw);
     			 }
-    			 delete m_raw;
+
     		 }
     	 }
-
+    	 delete m_raw;
     	 this->m_prevRps = new RPS;
     	 *m_prevRps = *m_rps;
-    	 NS_LOG_UNCOND ("+++++++emptyyy RPSSSS HEREEEEE" );
      }
-     else
+     else if (m_prevRps != nullptr && criticalList.size())
      {
     	 UpdateCriticalStaInfo (criticalList, receivedFromAids, enqueuedToAids, receivedTimes, outputpath);
+    	 //this->UdpateSensorStaInfo(sensorList, receivedFromAids, outputpath);
+
     	 //not initial, there was a non-empty RPS in the previous beacon but no successful receptions??????
     	 //2 possibilities:
     	 //   1) Unlucky RAW configuration: packets were enqueued at STA after RAW so they couldn't be TXed
@@ -1248,15 +1255,33 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
 
     	 //our strategy is to keep the same RAW grouping but shift in time for beacon_interval/2
     	 // TODO experiment with this setting in the end!!!!
-    	 for (int i = 0; i < m_prevRps->GetNumberOfRawGroups(); i++)
-    	 {
 
+    	 for (CriticalStationsCI ci = this->m_criticalStations.begin(); ci != m_criticalStations.end(); ci++)
+    	 {
+    		 if ((*ci)->m_nTx == 0)// TODO this will execute at the very end of simulation in case I schedule for the next beacon normally
+    		 {//TODO make sure this doesn't worsen the schedule in this case, add && m_tint == 0 or set states or something?
+
+    			 //state P_NRX
+    			 // keep the same RAW configuration but shift it in time for BI/2 for all loops
+    			 // not all loops have been present in m-prevRps, some might just be associated
+    			 SensorActuator * sta = LookupCriticalSta ((*ci)->GetAid());
+    			 if (sta->m_oldRawStart < INT_MAX)
+    				 sta->m_newRawStart = sta->m_oldRawStart + bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds() + m_prevRps->GetRawAssigmentObjFromAid((*ci)->GetAid()).GetSlotDuration() <= m_beaconInterval/2 ? sta->m_oldRawStart + m_beaconInterval/2 : 0;
+    			 else
+    				 sta->m_newRawStart = 0;
+    			 //This m_newRawStart is a wanted value, but it can be the same for multiple loops at this point. Later make sure all loops have their own non-overlapping slots
+    		 }
+    		 else
+    		 {
+    			 //state P_RX
+    		 }
     	 }
 
-    	 //m_criticalStations.clear();
+    	 //AssignRawToCriticalStations ();
+    	 // I've populated m_criticalStations, m_aidListPaged, m_aidList;
+    	 // I have to determine m_tInterval, m_tEnqMin etc for RAW assignment
 
-    	 m_aidList.clear();
-    	 m_aidListPaged.clear();
+
      }
      /*else if (!m_t_succ.empty() && m_prevRps)
      {
@@ -1297,7 +1322,120 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
      m_rps->Print(os);
      os.close();
+     ControlRps (criticalList);
+     m_aidList.clear();
+     m_aidListPaged.clear();
      return *m_rps;
+}
+
+void
+S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
+{
+	uint32_t beaconSize (27 + 26), numTimPaged (this->m_aidListPaged.size() > 0 ? 1 : 0), pagedSubblocks (0), pageBitmapLen(0);
+
+	// Assumption: only 1 TIM - this will not work for multiple TIMs. Paged subblocks then must be counted separately for each TIM
+	if (m_aidListPaged.size())
+	{
+		std::sort(m_aidListPaged.begin(), m_aidListPaged.end());
+		pagedSubblocks = std::unique(m_aidListPaged.begin(), m_aidListPaged.end(), [](const uint16_t a, const uint16_t b){return ((a >> 3) & 0x07) == ((b >> 3) & 0x07); }) - m_aidListPaged.begin();
+		pageBitmapLen =1; //TODO this can be 0,1,2,3,4 and should be read from the new page slice that will be constructed in this beacon
+	}
+
+	uint32_t rpsSize (2 + 6 * m_rps->GetNumberOfRawGroups());
+	uint32_t timSize (4 + numTimPaged * (1 + 2*31 + pagedSubblocks));
+	uint32_t pageSliceSize (6 + pageBitmapLen);
+	//NS_LOG_UNCOND("rps=" << rpsSize << ", timSize=" << timSize << ", pageSliceSize=" << pageSliceSize);
+	beaconSize += rpsSize + timSize + pageSliceSize;
+	//Here we assume data rate is 300000 bps, Nss=1 and symbol duration is 40 us
+	Time beaconTxDuration (MicroSeconds (240 + 40 * std::ceil((8 + 6 + 8 * beaconSize) / 12.)));
+	NS_LOG_UNCOND ("+++++beaconTxDuration = " << beaconTxDuration.GetMicroSeconds() << ", beaconSize=" << beaconSize << ", m_aidListPaged.size()=" << m_aidListPaged.size() << ", numTimPaged=" << numTimPaged);
+	Time rawlenCritical (Time (0)), rawlenSensors (Time (0));
+	for (int i = 0; i < this->m_rps->GetNumberOfRawGroups(); i++)
+	{
+			if (std::find (criticalList.begin(), criticalList.end(), m_rps->GetRawAssigmentObj(i).GetRawGroupAIDStart()) != criticalList.end())
+				rawlenCritical += m_rps->GetRawAssigmentObj(i).GetSlotDuration() * m_rps->GetRawAssigmentObj(i).GetSlotNum();
+			else
+				rawlenSensors += m_rps->GetRawAssigmentObj(i).GetSlotDuration() * m_rps->GetRawAssigmentObj(i).GetSlotNum();
+	}
+	if (this->m_beaconInterval - beaconTxDuration.GetMicroSeconds() < (rawlenCritical + rawlenSensors).GetMicroSeconds())
+	{
+		//raw too large
+		if (rawlenSensors > Time())
+		{
+			Time desiredDurationTotal = MicroSeconds(m_beaconInterval) - beaconTxDuration - rawlenCritical;
+			int i = 0;
+			bool fixed (false);
+			std::map<int, Time> rawIndexToDurationSensors;
+			while (rawlenSensors > desiredDurationTotal)
+			{
+				// if not critical
+				if (!(std::find (criticalList.begin(), criticalList.end(), m_rps->GetRawAssigmentObj(i).GetRawGroupAIDStart()) != criticalList.end()))
+				{
+					uint16_t start_aid (m_rps->GetRawAssigmentObj(i).GetRawGroupAIDStart());
+					uint16_t end_aid (m_rps->GetRawAssigmentObj(i).GetRawGroupAIDEnd());
+					Time currentRawDuration = m_rps->GetRawAssigmentObj(i).GetSlotDuration()*m_rps->GetRawAssigmentObj(i).GetSlotNum();
+					Time desired = currentRawDuration - (rawlenSensors - desiredDurationTotal);
+					if (desired >= (end_aid - start_aid + 1) * MicroSeconds(1300))
+					{
+						//ok, assign count
+						uint32_t count = (desired.GetMicroSeconds()/m_rps->GetRawAssigmentObj(i).GetSlotNum() - 500) / 120;
+						rawlenSensors -= m_rps->GetRawAssigmentObj(i).GetSlotDuration()*m_rps->GetRawAssigmentObj(i).GetSlotNum() - MicroSeconds(count * 120 + 500) * m_rps->GetRawAssigmentObj(i).GetSlotNum();
+						RPS::RawAssignment newRawAss = m_rps->GetRawAssigmentObj(i);
+						newRawAss.SetSlotDurationCount(count);
+						m_rps->ReplaceRawAssignmentAt(newRawAss, i);
+						NS_LOG_UNCOND ("RAW reduced at beacon=" << this->currentId + 1);
+						fixed = true;
+						break;
+					}
+					else
+					{
+						NS_LOG_UNCOND ("RAW no." << i << " in beacon no." << this->currentId << " is too short to reduce.");
+						rawIndexToDurationSensors.insert(std::pair<int, Time>(i, currentRawDuration));
+					}
+				}
+				i++;
+			}
+			if (!fixed)
+			{
+				NS_ASSERT (!rawIndexToDurationSensors.empty()); //if this is empty, critical RAWs are too long and I cannot shrink them. Too many control loops!
+				double coef = desiredDurationTotal / rawlenSensors;
+				for (std::map<int, Time>::iterator it = rawIndexToDurationSensors.begin(); it != rawIndexToDurationSensors.end(); it++)
+				{
+					Time scaledRawDuration = coef * (*it).second;
+					//TODO Slot durations are shrinked now. It could happen that slots are too short for 1 TX. I didn't handle this case
+					//In that case we should reduce the number of slots in order to increase the slot duration
+					uint16_t scaledCount = (scaledRawDuration.GetMicroSeconds() / m_rps->GetRawAssigmentObj((*it).first).GetSlotNum()- 500) / 120;
+					RPS::RawAssignment newRawAss = m_rps->GetRawAssigmentObj((*it).first);
+					newRawAss.SetSlotDurationCount(scaledCount);
+					m_rps->ReplaceRawAssignmentAt(newRawAss, (*it).first);
+					NS_LOG_UNCOND ("Multiple RAWs reduced at beacon=" << this->currentId + 1);
+				}
+			}
+		}
+		else if (rawlenCritical > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
+		{
+			NS_LOG_UNCOND ("Critical RAWs take more channel time than available. Reduce number of loops!");
+			NS_ASSERT (false);
+		}
+	}
+
+}
+
+void
+S1gRawCtr::AssignRawToCriticalStations ()
+{
+	//sort stations according to newRAW
+	std::cout << "BEFORE SORTING:" << std::endl;
+	for (auto s : m_criticalStations)
+	{
+		std::cout << "aid=" << (int)s->GetAid() <<", oldRawStart=" << s->m_oldRawStart << ", newRawStart=" << s->m_newRawStart <<std::endl;
+	}
+	std::sort(m_criticalStations.begin(), m_criticalStations.end(), [](const SensorActuator *a, const SensorActuator *b) {return a->m_newRawStart > b->m_newRawStart; });
+	std::cout << "AFTER SORTING:" << std::endl;
+	for (auto s : m_criticalStations)
+	{
+		std::cout << "aid=" << (int)s->GetAid() <<", oldRawStart=" << s->m_oldRawStart << ", newRawStart=" << s->m_newRawStart <<std::endl;
+	}
 }
 
 void
@@ -1306,6 +1444,55 @@ S1gRawCtr::deleteRps ()
     delete m_rps;
 }
 
+void S1gRawCtr::gandalf()
+{
+    std::cout <<
+    	"                           ,---.\n" <<
+        "                          /    |\n" <<
+        "                         /     |\n" <<
+        "                        /      |\n" <<
+        "                       /       |\n" <<
+        "                  ___,'        |\n" <<
+        "                <  -'          :\n" <<
+        "                 `-.__..--'``-,_\_\n" <<
+        "                    |o/ <o>` :,.)_`>\n" <<
+        "                    :/ `     ||/)\n" <<
+        "                    (_.).__,-` |\\\n" <<
+        "                    /( `.``   `| :\n" <<
+        "                    \'`-.)  `  ; ;\n" <<
+        "                    | `       /-<\n" <<
+        "                    |     `  /   `.\n" <<
+        "    ,-_-..____     /|  `    :__..-'\\\n" <<
+        "   /,'-.__\\\\  ``-./ :`      ;       \\\n" <<
+        "   `\ `\  `\\\\  \ :  (   `  /  ,   `. \\\n" <<
+        "     \` \   \\\\   |  | `   :  :     .\ \\\n" <<
+        "      \ `\_  ))  :  ;     |  |      ): :\n" <<
+        "     (`-.-'\ ||  |\ \   ` ;  ;       | |\n" <<
+        "      \-_   `;;._   ( `  /  /_       | |\n" <<
+        "       `-.-.// ,'`-._\__/_,'         ; |\n" <<
+        "          \:: :     /     `     ,   /  |\n" <<
+        "           || |    (        ,' /   /   |\n" <<
+        "           ||                ,'   /    |" << std::endl;
+}
+
+void S1gRawCtr::darth()
+{
+	std::cout <<
+					  "           _.-'~~~~~~`-._\n" <<
+			          "          /      ||      \\\n" <<
+			          "         /       ||       \\\n" <<
+			          "        |        ||        |\n" <<
+			          "        | _______||_______ |\n" <<
+			          "        |/ ----- \\/ ----- \\|\n" <<
+			          "       /  (     )  (     )  \\\n" <<
+			          "      / \\  ----- () -----  / \\\n" <<
+			          "     /   \\      /||\\      /   \\\n" <<
+			          "    /     \\    /||||\\    /     \\\n" <<
+			          "   /       \\  /||||||\\  /       \\\n" <<
+			          "  /_        \\o========o/        _\\\n" <<
+			          "    `--...__|`-._  _.-'|__...--'\n" <<
+			          "            |    `'    |" << std::endl;
+}
     /*
      void
      S1gRawCtr::configureRAW (RPS * m_rps, RPS::RawAssignment *  m_raw )
