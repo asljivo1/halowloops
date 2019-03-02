@@ -117,7 +117,11 @@ public:
    */
   uint8_t * GetRawAssignment (void) const;  //to do, use std::vector
   RPS::RawAssignment GetRawAssigmentObj(uint32_t index = 0) const;
-
+  RPS::RawAssignment GetRawAssigmentObjFromAid(uint16_t aid, uint32_t rawindex = 0) const;
+  void DeleteRawAssigmentObj(uint32_t raw_index);
+  void ReplaceRawAssignmentAt (RPS::RawAssignment raw, uint16_t index);
+  uint64_t GetRawSlotStartFromAid (uint16_t aid, uint32_t rawindex = 0) const;
+  uint32_t GetNumAssignedRaws (uint16_t aid);
   WifiInformationElementId ElementId () const;
   uint8_t GetInformationFieldSize () const;
   void Print (std::ostream &os) const;

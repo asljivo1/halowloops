@@ -23,6 +23,7 @@
 #include "ns3/log.h" //for test
 #include <sstream>
 #include <iomanip>
+#include <fstream>
 
 namespace ns3 {
 
@@ -249,7 +250,37 @@ RPS::~RPS ()
 //suppose all subfield of RAW Assignment are presented, 12 octets
 // change in future
 
+void
+RPS::ReplaceRawAssignmentAt (RPS::RawAssignment raw, uint16_t index)
+{
+	uint16_t raw_len = this->GetInformationFieldSize();
+	uint16_t rawAssignment_len = 6;
+	if (raw_len % rawAssignment_len !=0)
+	{
+		NS_ASSERT ("RAW configuration incorrect!");
+	}
+	uint8_t RAW_number = raw_len/rawAssignment_len;
+	NS_ASSERT (index < RAW_number);
 
+	std::ofstream os;
+	std::string outputpath = "replace-raw-test.txt";
+	os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
+	os << "OLD RAW\n";
+	this->Print(os);
+
+	m_rpsarry[index*6 + 0] = raw.GetRawControl ();
+	m_rpsarry[index*6 + 1] = (uint8_t)raw.GetRawSlot ();
+	m_rpsarry[index*6 + 2] = (uint8_t)(raw.GetRawSlot () >> 8);
+	m_rpsarry[index*6 + 3] = (uint8_t)(raw.GetRawGroup ());//(7-0)
+	m_rpsarry[index*6 + 4] = (uint8_t)(raw.GetRawGroup () >> 8);//(15-8)
+	m_rpsarry[index*6 + 5] = (uint8_t)(raw.GetRawGroup () >> 16);//(23-16)
+
+	m_rps = &m_rpsarry[0];
+
+	os << "\nNEW RAW\n";
+	this->Print(os);
+	os.close();
+}
 
 void
 RPS::SetRawAssignment (RPS::RawAssignment raw)
@@ -257,7 +288,6 @@ RPS::SetRawAssignment (RPS::RawAssignment raw)
 	//m_length = 0;
 	//uint8_t m_rpsarry[12]; //! Support up to 10 RAW Assignment subfield
 	//uint8_t len = assignment.GetSize ();
-	assignment = raw; ///ami
 	m_rpsarry.push_back(raw.GetRawControl ());
 	m_length++;
 	m_rpsarry.push_back((uint8_t)raw.GetRawSlot ());
@@ -308,6 +338,104 @@ RPS::GetRawAssignment (void) const
     return m_rps;
 }
 
+//Returns index-th RPS::RawAssignment aid belongs to. Default index is zero.
+RPS::RawAssignment
+RPS::GetRawAssigmentObjFromAid(uint16_t aid, uint32_t rawindex) const
+{
+	NS_ASSERT (rawindex < this->GetNumberOfRawGroups());
+	int counter (0);
+	for (int i = 0; i < this->GetNumberOfRawGroups(); i++)
+	{
+		RPS::RawAssignment ass = this->GetRawAssigmentObj(i);
+		if (ass.GetRawGroupAIDStart() <= aid && aid <= ass.GetRawGroupAIDEnd())
+		{
+			if (rawindex == counter)
+				return ass;
+			else
+				counter++;
+		}
+	}
+	if (counter < rawindex)
+		NS_LOG_UNCOND ("RPS::GetRawAssigmentObjFromAid cannot find the " << rawindex << "^th RAW to which aid=" << (int)aid << " belongs to because there is only"  << counter << " such raw assignments");
+	NS_ASSERT (counter == rawindex);
+}
+
+//Returns true if AID is assigned to any of the RAWs in this RPS, else returns false
+uint32_t
+RPS::GetNumAssignedRaws (uint16_t aid)
+{
+	uint32_t counter (0);
+	for (int i = 0; i < this->GetNumberOfRawGroups(); i++)
+	{
+		RPS::RawAssignment ass = this->GetRawAssigmentObj(i);
+		if (ass.GetRawGroupAIDStart() <= aid && aid <= ass.GetRawGroupAIDEnd())
+				counter++;
+	}
+	return counter;
+}
+
+//Returns the start time in microseconds of index-th RAW slot that AID belogs to
+uint64_t
+RPS::GetRawSlotStartFromAid (uint16_t aid, uint32_t rawindex) const
+{
+	NS_ASSERT (rawindex < this->GetNumberOfRawGroups());
+	int counter (0), timeacc(0);
+	for (int i = 0; i < this->GetNumberOfRawGroups(); i++)
+	{
+		RPS::RawAssignment ass = this->GetRawAssigmentObj(i);
+		if (ass.GetRawGroupAIDStart() <= aid && aid <= ass.GetRawGroupAIDEnd())
+		{
+			if (rawindex == counter)
+			{
+				int slotindex = aid % ass.GetSlotNum();
+				return timeacc += ass.GetSlotDuration().GetMicroSeconds() * slotindex;
+			}
+			else
+				counter++;
+		}
+		timeacc += ass.GetSlotDuration().GetMicroSeconds() + ass.GetSlotNum();
+	}
+
+	NS_LOG_UNCOND ("RPS::GetRawAssigmentObjFromAid cannot find the " << rawindex + 1 << "^th RAW to which aid=" << (int)aid << " belongs to because there is only "  << counter << " such raw assignments");
+	NS_ASSERT (false);
+}
+
+void
+RPS::DeleteRawAssigmentObj (uint32_t raw_index)
+{
+	uint16_t raw_len = this->GetInformationFieldSize();
+	uint16_t rawAssignment_len = 6;
+	if (raw_len % rawAssignment_len !=0)
+	{
+		NS_ASSERT ("RAW configuration incorrect!");
+	}
+	uint8_t RAW_number = raw_len/rawAssignment_len;
+	NS_ASSERT (raw_index < RAW_number);
+
+	std::ofstream os;
+	std::string outputpath = "delete-raw-test.txt";
+	os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
+	os << "OLD RAW\n";
+	this->Print(os);
+	//os.close();
+
+	/*m_rpsarry.erase(m_rpsarry.begin() + raw_index, m_rpsarry.begin() + raw_index + 6);
+	m_length -= 6;*/
+	for (int i = raw_index; i < RAW_number; i++)
+		for (int j = 0; j < 6; j++)
+		{
+			m_rpsarry[raw_index*rawAssignment_len+j] = m_rpsarry[(raw_index + 1)*rawAssignment_len+j];
+			m_length--;
+		}
+	m_rpsarry.resize(6 * (RAW_number - 1));
+	m_rps = &m_rpsarry[0];
+
+	os << "\nNEW RAW\n";
+	this->Print(os);
+	os.close();
+
+}
+
 RPS::RawAssignment
 RPS::GetRawAssigmentObj(uint32_t raw_index) const {
 	RPS::RawAssignment ass;
@@ -319,11 +447,11 @@ RPS::GetRawAssigmentObj(uint32_t raw_index) const {
 	{
 		NS_ASSERT ("RAW configuration incorrect!");
 	}
-	uint8_t RAW_number = raw_len/rawAssignment_len;
+	/*uint8_t RAW_number = raw_len/rawAssignment_len;
 
 	uint16_t slotDurationCount=0;
 	uint16_t slotNum=0;
-	uint64_t currentRAW_start=0;
+	uint64_t currentRAW_start=0;*/
 
 	uint8_t rawtypeindex = rawassign[raw_index*rawAssignment_len+0] & 0x07;
 	ass.SetRawTypeIndex(rawtypeindex); //TODO check 0
