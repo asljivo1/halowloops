@@ -266,6 +266,7 @@ private:
   std::vector<uint32_t> GetAllSlotNumbersFromAid(uint16_t aid) const;
   std::vector<uint32_t> GetAllSlotNumbersFromAid (uint16_t aid, RPS rps) const;
   uint32_t GetSlotNumFromRpsRawSlot (uint16_t rps, uint8_t rawg, uint8_t slot) const;
+  uint16_t GetCritAidFromSlotNum (uint8_t slotnum, RPS rps) const;
   RPSVector m_rpsset;
   Time GetSlotDurationFromAid (uint16_t aid) const;
   pageSlice m_pageslice;
