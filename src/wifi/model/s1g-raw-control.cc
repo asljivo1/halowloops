@@ -1316,13 +1316,13 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
 
      /*outputfile.open (sensorfile, std::ios::out | std::ios::trunc);
                  outputfile.close();*/
-
+     ControlRps (criticalList);
      std::ofstream os;
      outputpath += std::to_string(currentId) + ".txt";
      os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
      m_rps->Print(os);
      os.close();
-     ControlRps (criticalList);
+
      m_aidList.clear();
      m_aidListPaged.clear();
      return *m_rps;
