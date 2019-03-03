@@ -264,6 +264,7 @@ private:
   bool GetPageSlicingActivated (void) const;
   uint32_t GetNextSlotNumFromAid (uint16_t aid) const;
   std::vector<uint32_t> GetAllSlotNumbersFromAid(uint16_t aid) const;
+  std::vector<uint32_t> GetAllSlotNumbersFromAid (uint16_t aid, RPS rps) const;
   uint32_t GetSlotNumFromRpsRawSlot (uint16_t rps, uint8_t rawg, uint8_t slot) const;
   RPSVector m_rpsset;
   Time GetSlotDurationFromAid (uint16_t aid) const;
@@ -279,6 +280,8 @@ private:
     
   virtual void DoDispose (void);
   virtual void DoInitialize (void);
+  void UpdateQueues (RPS newRps);
+  void InitializeQueues (uint32_t num);
   
   TracedCallback<Ptr<const Packet>, Mac48Address, bool, bool, Time> m_packetToTransmitReceivedFromUpperLayer;
   TracedCallback<uint16_t,uint16_t> m_rawSlotStarted;

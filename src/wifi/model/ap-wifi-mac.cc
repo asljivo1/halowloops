@@ -45,6 +45,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <algorithm>
+#include <vector>
 
 namespace ns3 {
 
@@ -591,6 +592,34 @@ bool ApWifiMac::IsPagedInTim (uint32_t aid)
 		}
 	}
 	while (pos < m_TIM.GetInformationFieldSize() - 3);
+}
+
+std::vector<uint32_t>
+ApWifiMac::GetAllSlotNumbersFromAid (uint16_t aid, RPS rps) const
+{
+	uint32_t myslot = 0;
+	std::vector <uint32_t> myslotsVector;
+
+	//std::cout << "i=" << i << " has numRawGrups=" << (int)m_rpsset.rpsset.at(i)->GetNumberOfRawGroups() << std::endl;
+	for (uint32_t j = 0; j < rps.GetNumberOfRawGroups();	j++)
+	{
+		RPS::RawAssignment ass = rps.GetRawAssigmentObj(j);
+		//std::cout << "    j="<<j<< ", aidStart=" <<(int)ass.GetRawGroupAIDStart() << ", aidEnd=" << (int)ass.GetRawGroupAIDEnd() <<std::endl;
+
+		if (ass.GetRawGroupAIDStart() <= aid && aid <= ass.GetRawGroupAIDEnd()) {
+			myslot += aid % ass.GetSlotNum();
+			myslotsVector.push_back(myslot);
+			myslot += ass.GetSlotNum();
+			myslot -= aid % ass.GetSlotNum();
+		} else
+			myslot += ass.GetSlotNum();
+	}
+
+	/*std::cout << "\n aid=" << (int)aid << ", slots=";
+		for (auto slotnum : myslotsVector)
+			std::cout <<slotnum << ", ";
+		std::cout << std::endl;*/
+	return myslotsVector;
 }
 
 std::vector<uint32_t>
@@ -1268,9 +1297,9 @@ void ApWifiMac::SetaccessList(std::map<Mac48Address, bool> list) {
 }
 
 template <typename T>
-void delete_pointed_to (T* const ptr)
+void delete_second_pointed_to (T* const it)
 {
-	delete ptr;
+	delete it->second;
 }
 
 void ApWifiMac::SendOneBeacon(void) {
@@ -1346,8 +1375,10 @@ void ApWifiMac::SendOneBeacon(void) {
 		{
 			RPS rps;
 			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
+			UpdateQueues(rps);
 			int i = 0;
-			while (i < m_rpsset.rpsset.at(0)->GetNumberOfRawGroups())
+			int oldNumRaws = m_rpsset.rpsset.at(0)->GetNumberOfRawGroups();
+			while (i < oldNumRaws)
 			{
 				if (rps.GetNumberOfRawGroups() > i)
 				{
@@ -1358,9 +1389,12 @@ void ApWifiMac::SendOneBeacon(void) {
 					m_rpsset.rpsset.at(0)->DeleteRawAssigmentObj(i);
 					i--;
 				}
-				NS_LOG_UNCOND ("i=" << i);
 				i++;
-
+			}
+			while (i >= oldNumRaws && i < rps.GetNumberOfRawGroups())
+			{
+				m_rpsset.rpsset.at(0)->SetRawAssignment(rps.GetRawAssigmentObj(i));
+				i++;
 			}
 		}
 
@@ -1869,7 +1903,7 @@ void ApWifiMac::TxOk(const WifiMacHeader &hdr) {
 		}
 		if (aidList.size() > 1) {
 			m_loopAids.push_back(aidList);
-			m_updateRps = true;
+			//m_updateRps = true;
 		}
 	}
 }
@@ -2117,6 +2151,235 @@ void ApWifiMac::DeaggregateAmsduAndForward(Ptr<Packet> aggregatedPacket,
 	}
 }
 
+void
+ApWifiMac::UpdateQueues (RPS newRps)
+{
+	// just assgn the old edca object to the new one (it's a pointer anyway?), rearrange the queue and add new elements if needed or delete some
+	// for each non-empty old slot find corresponding new slot and enqueue the packets there
+	// m_rps is still the old one
+
+	auto newTotalNumSlots = newRps.GetTotalNumSlots();
+
+	bool change (false);
+	if (this->m_rpsset.rpsset.at(0)->GetNumberOfRawGroups() != newRps.GetNumberOfRawGroups() ||
+			newTotalNumSlots != m_rpsset.rpsset.at(0)->GetTotalNumSlots())
+	{
+		change = true;
+	}
+	else
+	{
+		for (int i = 0; i < newRps.GetNumberOfRawGroups(); i++)
+		{
+			auto oldAss = m_rpsset.rpsset.at(0)->GetRawAssigmentObj(i);
+			auto newAss = newRps.GetRawAssigmentObj(i);
+			if (oldAss.GetSlotNum() != newAss.GetSlotNum() || oldAss.GetRawGroupAIDStart() != newAss.GetRawGroupAIDStart() || oldAss.GetRawGroupAIDEnd() != newAss.GetRawGroupAIDEnd())
+			{
+				change = true;
+				break;
+			}
+		}
+	}
+
+	if (!change)
+		return;
+
+	NS_LOG_UNCOND ("****************************CHANGE QUEUES**************************");
+	std::vector<EdcaQueues> new_rawSlotsEdca;
+	std::vector<Ptr<DcaTxop> > new_rawSlotsDca;
+
+	// we need more edca queues because new RPS has more slots
+	for (uint32_t i = this->m_rpsset.rpsset.at(0)->GetTotalNumSlots(); i < newTotalNumSlots; i++)
+	{
+		Ptr<DcaTxop> dca = CreateObject<DcaTxop>();
+		dca->SetLow(m_low);
+		dca->SetManager(m_dcfManager);
+		dca->SetTxMiddle(m_txMiddle);
+		dca->SetTxOkCallback(MakeCallback(&ApWifiMac::TxOk, this));
+		dca->SetTxFailedCallback(MakeCallback(&ApWifiMac::TxFailed, this));
+		dca->SetWifiRemoteStationManager(m_stationManager);
+		dca->GetQueue()->TraceConnect("PacketDropped", "", MakeCallback(&ApWifiMac::OnQueuePacketDropped, this));
+		dca->TraceConnect("Collision", "", MakeCallback(&ApWifiMac::OnCollision, this));
+		// ensure queues don't expire too fast
+		dca->GetQueue()->SetMaxDelay(MilliSeconds(10000)); //todo hardcoded value
+		dca->Initialize();
+		ConfigureDcf(dca, 15, 1023, AC_BE_NQOS);
+		m_rawSlotsDca.push_back(dca);
+
+		EdcaQueues edca;
+		SetupEdcaQueue(AC_VO, edca);
+		SetupEdcaQueue(AC_VI, edca);
+		SetupEdcaQueue(AC_BE, edca);
+		SetupEdcaQueue(AC_BK, edca);
+		for (EdcaQueues::iterator i = edca.begin(); i != edca.end(); ++i) {
+			i->second->Initialize();
+		}
+		m_rawSlotsEdca.push_back(edca);
+	}
+
+	std::vector<uint16_t> pagedCpy (m_enqueuedToAids);
+	std::sort(pagedCpy.begin(), pagedCpy.begin());
+	std::vector<uint16_t>::iterator unique_it;
+	unique_it = std::unique(pagedCpy.begin(), pagedCpy.end());
+	pagedCpy.resize(std::distance(pagedCpy.begin(), unique_it) );
+	std::vector<uint16_t>::iterator it = pagedCpy.begin();
+
+	while ( it != pagedCpy.end())
+	{
+		NS_LOG_UNCOND ("paged + aid=" << *it);
+		Mac48Address dest = this->m_AidToMacAddr.find(*it)->second;
+		std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (*it);
+		for (auto targetSlot : allTargetSlots)
+		{
+			Ptr<const Packet> peekedPacket_VO = m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest);
+			Ptr<const Packet> peekedPacket_VI = m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest);
+			Ptr<const Packet> peekedPacket_BE = m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest);
+			Ptr<const Packet> peekedPacket_BK = m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest);
+
+			Ptr<const Packet> peekedPacket = m_rawSlotsDca[targetSlot]->GetQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest);
+			if (peekedPacket_VO != 0 || peekedPacket_VO != 0 || peekedPacket_VO != 0 || peekedPacket_VO != 0 || peekedPacket != 0)
+			{
+				NS_LOG_UNCOND ("++++ AID=" << *it << " has " << m_rawSlotsEdca[targetSlot].size() / 4 << " packets enqueued in slot " << targetSlot);
+				std::vector<uint32_t> new_allTargetSlots = GetAllSlotNumbersFromAid (*it, newRps);
+				NS_LOG_UNCOND ("++++ PACKETS MUST BE ENQUEUED TO NEW SLOT " << new_allTargetSlots[0]);
+
+				WifiMacHeader hdr;
+				if (m_qosSupported)
+				{
+					hdr.SetType(WIFI_MAC_QOSDATA);
+					hdr.SetQosAckPolicy(WifiMacHeader::NORMAL_ACK);
+					hdr.SetQosNoEosp();
+					hdr.SetQosNoAmsdu();
+					//Transmission of multiple frames in the same TXOP is not
+					//supported for now
+					hdr.SetQosTxopLimit(0);
+					//Fill in the QoS control field in the MAC header
+					uint8_t tid = 0;
+
+
+					if (peekedPacket_VO != 0)
+					{
+						tid = QosUtilsGetTidForPacket(peekedPacket_VO);
+						if (tid > 7)
+							tid = 0;
+						hdr.SetQosTid(tid);
+						//new_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VO)->second->Queue(peekedPacket_VO, hdr);
+						new_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VO)->second->QueueNoAccess(peekedPacket_VO, hdr);
+					}
+					if (peekedPacket_VI != 0)
+					{
+						tid = QosUtilsGetTidForPacket(peekedPacket_VO);
+						if (tid > 7)
+							tid = 0;
+						hdr.SetQosTid(tid);
+						//new_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VI)->second->Queue(peekedPacket_VI, hdr);
+						new_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VI)->second->QueueNoAccess(peekedPacket_VI, hdr);
+					}
+					if (peekedPacket_BE != 0)
+					{
+						tid = QosUtilsGetTidForPacket(peekedPacket_VO);
+						if (tid > 7)
+							tid = 0;
+						hdr.SetQosTid(tid);
+						//new_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->Queue(peekedPacket_BE, hdr);
+						new_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->QueueNoAccess(peekedPacket_BE, hdr);
+					}
+					if (peekedPacket_BK != 0)
+					{
+						tid = QosUtilsGetTidForPacket(peekedPacket_VO);
+						if (tid > 7)
+							tid = 0;
+						hdr.SetQosTid(tid);
+						//new_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BK)->second->Queue(peekedPacket_BK, hdr);
+						new_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BK)->second->QueueNoAccess(peekedPacket_BK, hdr);
+					}
+				}
+				else
+				{
+					hdr.SetTypeData();
+					if (peekedPacket != 0)
+					{
+						//new_rawSlotsDca[new_allTargetSlots[0]]->Queue(peekedPacket, hdr);
+						new_rawSlotsDca[new_allTargetSlots[0]]->QueueNoAccess(peekedPacket, hdr);
+					}
+
+				}
+
+
+			}
+		}
+		it++;
+	}
+	//I have rearranged the queues, now I can delete viska edca queues
+	for (uint32_t i = newTotalNumSlots; i < this->m_rpsset.rpsset.at(0)->GetTotalNumSlots(); i++)
+	{
+		m_rawSlotsDca[i]->RemoveManager(this->m_dcfManager);
+		m_rawSlotsDca[i]->Dispose();
+		for (EdcaQueues::iterator it = m_rawSlotsEdca[i].begin(); it != m_rawSlotsEdca[i].end(); ++it)
+		{
+			it->second->RemoveManager(this->m_dcfManager);
+			it->second->Dispose();
+		}
+
+	}
+
+	// empty m_rawSlotsEdca, assign new_rawSlotsEdca to m_rawSlotsEdca, delete new_rawSlotsEdca
+
+	m_rawSlotsDca.resize(newTotalNumSlots);
+	//m_rawSlotsDca = new_rawSlotsDca;
+	m_rawSlotsEdca.resize(newTotalNumSlots);
+	//m_rawSlotsEdca = new_rawSlotsEdca;
+	for (uint32_t i = 0; i < new_rawSlotsEdca.size(); i++)
+	{
+		new_rawSlotsDca[i]->Dispose();
+		for (EdcaQueues::iterator it = new_rawSlotsEdca[i].begin(); it != new_rawSlotsEdca[i].end(); ++it)
+			it->second->Dispose();
+	}
+	/*if (new_rawSlotsEdca.size())
+	{
+		new_rawSlotsEdca.erase(new_rawSlotsEdca.begin(), new_rawSlotsEdca.end());
+	}*/
+
+}
+void
+ApWifiMac::InitializeQueues (uint32_t num)
+{
+	//m_rawSlotsDca = std::vector<Ptr<DcaTxop>>();
+	for (uint32_t i = 0; i < num; i++)
+	{
+
+		Ptr<DcaTxop> dca = CreateObject<DcaTxop>();
+		dca->SetLow(m_low);
+		dca->SetManager(m_dcfManager);
+		dca->SetTxMiddle(m_txMiddle);
+		dca->SetTxOkCallback(MakeCallback(&ApWifiMac::TxOk, this));
+		dca->SetTxFailedCallback(MakeCallback(&ApWifiMac::TxFailed, this));
+
+		dca->SetWifiRemoteStationManager(m_stationManager);
+
+		dca->GetQueue()->TraceConnect("PacketDropped", "",
+				MakeCallback(&ApWifiMac::OnQueuePacketDropped, this));
+
+		dca->TraceConnect("Collision", "",
+				MakeCallback(&ApWifiMac::OnCollision, this));
+
+		// ensure queues don't expire too fast
+		dca->GetQueue()->SetMaxDelay(MilliSeconds(10000)); //todo hardcoded value
+		dca->Initialize();
+		ConfigureDcf(dca, 15, 1023, AC_BE_NQOS);
+		m_rawSlotsDca.push_back(dca);
+
+		EdcaQueues edca;
+		SetupEdcaQueue(AC_VO, edca);
+		SetupEdcaQueue(AC_VI, edca);
+		SetupEdcaQueue(AC_BE, edca);
+		SetupEdcaQueue(AC_BK, edca);
+		for (EdcaQueues::iterator i = edca.begin(); i != edca.end(); ++i) {
+			i->second->Initialize();
+		}
+		m_rawSlotsEdca.push_back(edca);
+	}
+}
+
 void ApWifiMac::SetupEdcaQueue(enum AcIndex ac, EdcaQueues& edcaqueues) {
 	NS_LOG_FUNCTION(this << ac);
 
@@ -2185,40 +2448,7 @@ void ApWifiMac::DoInitialize(void) {
 		}
 	}
 
-	m_rawSlotsDca = std::vector<Ptr<DcaTxop>>();
-	for (uint32_t i = 0; i < totalSlots; i++) {
-
-		Ptr<DcaTxop> dca = CreateObject<DcaTxop>();
-		dca->SetLow(m_low);
-		dca->SetManager(m_dcfManager);
-		dca->SetTxMiddle(m_txMiddle);
-		dca->SetTxOkCallback(MakeCallback(&ApWifiMac::TxOk, this));
-		dca->SetTxFailedCallback(MakeCallback(&ApWifiMac::TxFailed, this));
-
-		dca->SetWifiRemoteStationManager(m_stationManager);
-
-		dca->GetQueue()->TraceConnect("PacketDropped", "",
-				MakeCallback(&ApWifiMac::OnQueuePacketDropped, this));
-
-		dca->TraceConnect("Collision", "",
-				MakeCallback(&ApWifiMac::OnCollision, this));
-
-		// ensure queues don't expire too fast
-		dca->GetQueue()->SetMaxDelay(MilliSeconds(10000)); //todo hardcoded value
-		dca->Initialize();
-		ConfigureDcf(dca, 15, 1023, AC_BE_NQOS);
-		m_rawSlotsDca.push_back(dca);
-
-		EdcaQueues edca;
-		SetupEdcaQueue(AC_VO, edca);
-		SetupEdcaQueue(AC_VI, edca);
-		SetupEdcaQueue(AC_BE, edca);
-		SetupEdcaQueue(AC_BK, edca);
-		for (EdcaQueues::iterator i = edca.begin(); i != edca.end(); ++i) {
-			i->second->Initialize();
-		}
-		m_rawSlotsEdca.push_back(edca);
-	}
+	InitializeQueues (totalSlots);
 	staIsActiveDuringCurrentCycle = std::vector<bool>(m_totalStaNum, false);
 	RegularWifiMac::DoInitialize();
 }
