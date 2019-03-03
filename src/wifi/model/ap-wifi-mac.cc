@@ -2252,9 +2252,15 @@ ApWifiMac::UpdateQueues (RPS newRps)
 	pagedCpy.resize(std::distance(pagedCpy.begin(), unique_it) );
 
 	typedef std::vector<Ptr<const Packet> > PtrsToPackets;
+	typedef std::vector<AcIndex> AcIndices;
 	std::map<uint16_t, PtrsToPackets> tempStoragePackets;
+	std::map<uint16_t, AcIndices> tempStorageAcIndices;
 	for (auto aid : pagedCpy)
+	{
 		tempStoragePackets.insert(std::pair<uint16_t, PtrsToPackets>(aid, PtrsToPackets() ) );
+		tempStorageAcIndices.insert(std::pair<uint16_t, AcIndices>(aid, AcIndices() ) );
+
+	}
 	std::vector<uint16_t>::iterator it = pagedCpy.begin();
 
 	while ( it != pagedCpy.end())
@@ -2329,6 +2335,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 								auto newPkt = m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VO)->second->GetEdcaQueue()->Peek(&hdr);
 								NS_ASSERT (tid == QosUtilsGetTidForPacket(newPkt));
 								tempStoragePackets[aid_oldSlot].push_back(newPkt);
+								tempStorageAcIndices[aid_oldSlot].push_back(AC_VO);
 								m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VO)->second->GetEdcaQueue()->Remove(newPkt);
 							}
 						}
@@ -2356,6 +2363,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 								auto newPkt = m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VI)->second->GetEdcaQueue()->Peek(&hdr);
 								NS_ASSERT (tid == QosUtilsGetTidForPacket(newPkt));
 								tempStoragePackets[aid_oldSlot].push_back(newPkt);
+								tempStorageAcIndices[aid_oldSlot].push_back(AC_VI);
 								m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VI)->second->GetEdcaQueue()->Remove(newPkt);
 							}
 						}
@@ -2383,6 +2391,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 								auto newPkt = m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->Peek(&hdr);
 								NS_ASSERT (tid == QosUtilsGetTidForPacket(newPkt));
 								tempStoragePackets[aid_oldSlot].push_back(newPkt);
+								tempStorageAcIndices[aid_oldSlot].push_back(AC_BE);
 								m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->Remove(newPkt);
 							}
 						}
@@ -2410,6 +2419,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 								auto newPkt = m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BK)->second->GetEdcaQueue()->Peek(&hdr);
 								NS_ASSERT (tid == QosUtilsGetTidForPacket(newPkt));
 								tempStoragePackets[aid_oldSlot].push_back(newPkt);
+								tempStorageAcIndices[aid_oldSlot].push_back(AC_BK);
 								m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BK)->second->GetEdcaQueue()->Remove(newPkt);
 							}
 						}
@@ -2436,6 +2446,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 							{
 								auto newPkt = m_rawSlotsDca[new_allTargetSlots[0]]->GetQueue()->Peek(&hdr);
 								tempStoragePackets[aid_oldSlot].push_back(newPkt);
+								tempStorageAcIndices[aid_oldSlot].push_back(AC_BE_NQOS);
 								m_rawSlotsDca[new_allTargetSlots[0]]->GetQueue()->Remove(newPkt);
 							}
 						}
@@ -2454,10 +2465,62 @@ ApWifiMac::UpdateQueues (RPS newRps)
 	}
 	//I have iterated through the old RPS over all paged aids and all their assigned slots in the old RPS
 	//I have stored some in the tempStorage maybe, time to place those
-	for (auto item : tempStoragePackets)
+	std::map<uint16_t, PtrsToPackets>::iterator mi = tempStoragePackets.begin();
+	for (mi = tempStoragePackets.begin(); mi != tempStoragePackets.end(); mi++)
 	{
 		//TODO
+		uint16_t aid = mi->first;
+		std::vector<uint32_t> new_allTargetSlots = GetAllSlotNumbersFromAid (aid, newRps);
+		WifiMacHeader hdr;
+		int vecIndex = 0;
+		if (m_qosSupported)
+		{
+			hdr.SetType(WIFI_MAC_QOSDATA);
+			hdr.SetQosAckPolicy(WifiMacHeader::NORMAL_ACK);
+			hdr.SetQosNoEosp();
+			hdr.SetQosNoAmsdu();
+			hdr.SetQosTxopLimit(0);
+			//Fill in the QoS control field in the MAC header
+			uint8_t tid = 0;
+			for (auto& p_pkt : mi->second)
+			{
+				tid = QosUtilsGetTidForPacket(p_pkt);
+				if (tid > 7)
+					tid = 0;
+				hdr.SetQosTid(tid);
+				if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_VI)
+					m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VI)->second->QueueNoAccess(p_pkt, hdr);
+				else if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_VO)
+					m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VO)->second->QueueNoAccess(p_pkt, hdr);
+				else if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_BE)
+					m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->QueueNoAccess(p_pkt, hdr);
+				else if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_BK)
+					m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BK)->second->QueueNoAccess(p_pkt, hdr);
+				else if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_BE_NQOS)
+					m_rawSlotsDca[new_allTargetSlots[0]]->QueueNoAccess(p_pkt, hdr);
+				vecIndex++;
+			}
+		}
+		else
+		{
+			hdr.SetTypeData();
+			for (auto& p_pkt : mi->second)
+			{
+				if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_VI)
+					m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VI)->second->QueueNoAccess(p_pkt, hdr);
+				else if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_VO)
+					m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VO)->second->QueueNoAccess(p_pkt, hdr);
+				else if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_BE)
+					m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->QueueNoAccess(p_pkt, hdr);
+				else if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_BK)
+					m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BK)->second->QueueNoAccess(p_pkt, hdr);
+				else if (tempStorageAcIndices.find(aid)->second[vecIndex] == AC_BE_NQOS)
+					m_rawSlotsDca[new_allTargetSlots[0]]->QueueNoAccess(p_pkt, hdr);
+				vecIndex++;
+			}
+		}
 	}
+
 	//I have rearranged the queues, now I can delete the ones too many
 	for (uint32_t i = newTotalNumSlots; i < this->m_rpsset.rpsset.at(0)->GetTotalNumSlots(); i++)
 	{
