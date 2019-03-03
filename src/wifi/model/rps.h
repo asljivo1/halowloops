@@ -129,7 +129,7 @@ public:
   void SerializeInformationField (Buffer::Iterator start) const;
   uint8_t DeserializeInformationField (Buffer::Iterator start, uint8_t length);
   uint8_t GetNumberOfRawGroups (void) const;
-
+  uint32_t GetTotalNumSlots (void) const;
   uint8_t m_length;
 private:
   RPS::RawAssignment assignment; //!< RawAssignment subfield

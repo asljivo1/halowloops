@@ -436,6 +436,15 @@ RPS::DeleteRawAssigmentObj (uint32_t raw_index)
 
 }
 
+uint32_t
+RPS::GetTotalNumSlots (void) const
+{
+	uint32_t num (0);
+	for (int i = 0; i < GetNumberOfRawGroups(); i++)
+		num += GetRawAssigmentObj(i).GetSlotNum();
+	return num;
+}
+
 RPS::RawAssignment
 RPS::GetRawAssigmentObj(uint32_t raw_index) const {
 	RPS::RawAssignment ass;
