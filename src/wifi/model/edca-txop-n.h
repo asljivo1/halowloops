@@ -124,6 +124,7 @@ public:
    * \param manager DcfManager
    */
   void SetManager (DcfManager *manager);
+  void RemoveManager (DcfManager *manager);
   /**
    * \param callback the callback to invoke when a
    * packet transmission was completed successfully.
@@ -402,7 +403,7 @@ public:
    * can be sent safely.
    */
   void Queue (Ptr<const Packet> packet, const WifiMacHeader &hdr);
-
+  void QueueNoAccess (Ptr<const Packet> packet, const WifiMacHeader &hdr);
   void SetMsduAggregator (Ptr<MsduAggregator> aggr);
 
   /**

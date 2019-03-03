@@ -327,7 +327,7 @@ public:
    * highest priority, etc.
    */
   void Add (DcfState *dcf);
-
+  void Remove (DcfState *dcf);
   /**
    * \param state a DcfState
    *

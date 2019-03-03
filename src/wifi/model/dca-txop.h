@@ -107,6 +107,7 @@ public:
    * \param manager DcfManager
    */
   void SetManager (DcfManager *manager);
+  void RemoveManager (DcfManager *manager);
   /**
    * Set WifiRemoteStationsManager this DcaTxop is associated to.
    *
@@ -153,7 +154,7 @@ public:
    * can be sent safely.
    */
   void Queue (Ptr<const Packet> packet, const WifiMacHeader &hdr);
-
+  void QueueNoAccess (Ptr<const Packet> packet, const WifiMacHeader &hdr);
   /**
    * Assign a fixed random variable stream number to the random variables
    * used by this model.  Return the number of streams (possibly zero) that

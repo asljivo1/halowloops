@@ -390,6 +390,13 @@ EdcaTxopN::SetManager (DcfManager *manager)
 }
 
 void
+EdcaTxopN::RemoveManager (DcfManager *manager)
+{
+	NS_LOG_FUNCTION (this << manager);
+	m_manager->Remove(m_dcf);
+}
+
+void
 EdcaTxopN::SetTxOkCallback (TxOk callback)
 {
   NS_LOG_FUNCTION (this << &callback);
@@ -936,6 +943,17 @@ EdcaTxopN::Queue (Ptr<const Packet> packet, const WifiMacHeader &hdr)
                                      packet, fullPacketSize);
   m_queue->Enqueue (packet, hdr);
   StartAccessIfNeeded ();
+}
+
+void
+EdcaTxopN::QueueNoAccess (Ptr<const Packet> packet, const WifiMacHeader &hdr)
+{
+  NS_LOG_FUNCTION (this << packet << &hdr);
+  WifiMacTrailer fcs;
+  uint32_t fullPacketSize = hdr.GetSerializedSize () + packet->GetSize () + fcs.GetSerializedSize ();
+  m_stationManager->PrepareForQueue (hdr.GetAddr1 (), &hdr,
+                                     packet, fullPacketSize);
+  m_queue->Enqueue (packet, hdr);
 }
 
 void

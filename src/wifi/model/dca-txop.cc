@@ -196,6 +196,13 @@ DcaTxop::DoDispose (void)
 }
 
 void
+DcaTxop::RemoveManager (DcfManager *manager)
+{
+	NS_LOG_FUNCTION (this << manager);
+	m_manager->Remove(m_dcf);
+}
+
+void
 DcaTxop::SetManager (DcfManager *manager)
 {
   NS_LOG_FUNCTION (this << manager);
@@ -296,6 +303,18 @@ DcaTxop::Queue (Ptr<const Packet> packet, const WifiMacHeader &hdr)
                                      packet, fullPacketSize);
   m_queue->Enqueue (packet, hdr);
   StartAccessIfNeeded ();
+}
+
+void
+DcaTxop::QueueNoAccess (Ptr<const Packet> packet, const WifiMacHeader &hdr)
+{
+  NS_LOG_FUNCTION (this << packet << &hdr);
+  NS_LOG_DEBUG("DcaTxop::Queue " << Simulator::Now () << "\t" << m_low->GetAddress () << "\t" << packet->GetSize ());
+  WifiMacTrailer fcs;
+  uint32_t fullPacketSize = hdr.GetSerializedSize () + packet->GetSize () + fcs.GetSerializedSize ();
+  m_stationManager->PrepareForQueue (hdr.GetAddr1 (), &hdr,
+                                     packet, fullPacketSize);
+  m_queue->Enqueue (packet, hdr);
 }
 
 int64_t

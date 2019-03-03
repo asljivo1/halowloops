@@ -27,7 +27,7 @@
 #include "wifi-mac.h"
 #include "mac-low.h"
 #include "ns3/time-series-adaptor.h"
-
+#include <algorithm>
 
 #define MY_DEBUG(x) \
   NS_LOG_DEBUG (Simulator::Now () << " " << this << " " << x)
@@ -464,6 +464,15 @@ DcfManager::Add (DcfState *dcf)
 {
   NS_LOG_FUNCTION (this << dcf);
   m_states.push_back (dcf);
+}
+
+void
+DcfManager::Remove (DcfState *dcf)
+{
+	NS_LOG_FUNCTION (this << dcf);
+	std::vector<DcfState *>::iterator it = std::find (m_states.begin(), m_states.end(), dcf);
+
+	m_states.erase(it);
 }
 
 Time
