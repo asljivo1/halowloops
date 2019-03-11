@@ -53,6 +53,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <climits>
+#include <iterator>
+#include <map>
 
 namespace ns3 {
 
@@ -60,7 +62,57 @@ NS_LOG_COMPONENT_DEFINE ("S1gRawCtr");
 
 //NS_OBJECT_ENSURE_REGISTERED (S1gRawCtr);
 
-SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0), m_oldRawStart (INT_MAX)
+Slot::Slot () : m_assignedAid(0), m_slotCount(0), m_slotStartTime(Time ()), m_slotDuration(Time ()), m_slotFormat (1)
+{}
+
+Slot::~Slot ()
+{}
+
+uint16_t
+Slot::GetAid (void) const
+{
+	return m_assignedAid;
+}
+
+void
+Slot::SetAid (uint16_t aid)
+{
+	NS_ASSERT (aid > 0 && aid < 8192);
+	m_assignedAid = aid;
+}
+
+uint16_t
+Slot::GetSlotCount (void) const
+{
+	return m_slotCount;
+}
+
+void
+Slot::SetSlotCount (uint16_t count)
+{
+	NS_ASSERT((!m_slotFormat & (count < 256)) || (m_slotFormat & (count < 2048)));
+	m_slotCount = count;
+}
+
+Time
+Slot::GetSlotDuration (void) const
+{
+	return MicroSeconds(500 + 120 * GetSlotCount());
+}
+
+Time
+Slot::GetSlotStartTime (void) const
+{
+	return m_slotStartTime;
+}
+
+void
+Slot::SetSlotStartTime (Time start)
+{
+	m_slotStartTime = start;
+}
+
+SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0), m_oldRawStart (INT_MAX), m_newRawStart (INT_MAX), m_tSent (Time ()), m_tSentPrev (Time ()), m_tInterval (Time ()), m_tIntervalMin (Time ()), m_tIntervalMax (Time ()), m_tEnqMin (Time ())
 {
 
 }
@@ -243,7 +295,7 @@ S1gRawCtr::~S1gRawCtr ()
 }
 
 void
-S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::string outputpath)
+S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::string outputpath)
 {
 	for (std::vector<uint16_t>::iterator ci = criticalAids.begin(); ci != criticalAids.end(); ci++)
 	{
@@ -319,6 +371,17 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 					stationTransmit->m_nTx=++nTX;
 					stationTransmit->m_tSuccessPreLast = stationTransmit->m_tSuccessLast;
 					stationTransmit->m_tSuccessLast = receivedTimes[i];
+					stationTransmit->m_tSentPrev = stationTransmit->m_tSent;
+					stationTransmit->m_tSent = sentTimes[i];
+					if (stationTransmit->m_tSentPrev != Time ())
+					{
+						if (stationTransmit->m_tInterval == Time ())
+							stationTransmit->m_tInterval = stationTransmit->m_tSent - stationTransmit->m_tSentPrev;
+						else
+							NS_ASSERT (stationTransmit->m_tInterval == stationTransmit->m_tSent - stationTransmit->m_tSentPrev);
+					}
+					//NS_LOG_UNCOND ("*****aid=" << *ci << ", m_tInterval=" << stationTransmit->m_tInterval << ", m_tSent=" << stationTransmit->m_tSent << ", m_tSentPrev=" << stationTransmit->m_tSentPrev);
+					//NS_LOG_UNCOND ("m_tSuccessLast=" << stationTransmit->m_tSuccessLast << ", m_tSuccessPreLast=" << stationTransmit->m_tSuccessPreLast << ", m_nTx=" << stationTransmit->m_nTx);
 				}
 			}
 		}
@@ -1244,7 +1307,8 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      }
      else if (m_prevRps != nullptr && criticalList.size())
      {
-    	 UpdateCriticalStaInfo (criticalList, receivedFromAids, enqueuedToAids, receivedTimes, outputpath);
+    	 UpdateCriticalStaInfo (criticalList, receivedFromAids, enqueuedToAids, receivedTimes, sentTimes, outputpath);
+
     	 //this->UdpateSensorStaInfo(sensorList, receivedFromAids, outputpath);
 
     	 //not initial, there was a non-empty RPS in the previous beacon but no successful receptions??????
@@ -1255,7 +1319,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
 
     	 //our strategy is to keep the same RAW grouping but shift in time for beacon_interval/2
     	 // TODO experiment with this setting in the end!!!!
-
+    	 /*
     	 for (CriticalStationsCI ci = this->m_criticalStations.begin(); ci != m_criticalStations.end(); ci++)
     	 {
     		 if ((*ci)->m_nTx == 0)// TODO this will execute at the very end of simulation in case I schedule for the next beacon normally
@@ -1276,8 +1340,72 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     			 //state P_RX
     		 }
     	 }
+    	  */
+    	 std::vector<Slot> allSlots;
+    	 std::map<uint16_t, std::vector <Time> > rawStartsCritical;
+    	 for (CriticalStationsCI ci = this->m_criticalStations.begin(); ci != m_criticalStations.end(); ci++)
+    	 {
+    		 SensorActuator * sta = LookupCriticalSta ((*ci)->GetAid());
+    		 //sta->m_newRawStart = (sta->m_tSent + sta->m_tInterval).GetMicroSeconds();
+    		 if (sta->m_tInterval != Time ())
+    		 {
+    			 uint16_t n (1);
+    			 while (sta->m_tSent + n * sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval))
+    			 {
+    				 if (sta->m_tSent + n * sta->m_tInterval > Simulator::Now())
+    				 {
+    					 if (rawStartsCritical.find((*ci)->GetAid()) == rawStartsCritical.end())
+    					 {
+    						 //didn't find it, add it
+    						 rawStartsCritical.insert(std::pair<uint16_t, std::vector <Time> >((*ci)->GetAid(), std::vector <Time>()));
+    						 rawStartsCritical[(*ci)->GetAid()].push_back (sta->m_tSent + n * sta->m_tInterval);
+    					 }
+    					 else
+    					 {
+    						 //found aid, append it's vector
+    						 rawStartsCritical[(*ci)->GetAid()].push_back(sta->m_tSent + n * sta->m_tInterval );
+    					 }
+    				 }
+    				 else
+    				 {
+    					 //sta->m_tSent + n * sta->m_tInterval is in the past, meaning it wasn't delivered
+    					 //assign a RAW to this station ASAP to allow late packets to be sent
+    					 //NS_LOG_UNCOND ("NOW = " << Simulator::Now());
+    					 if (rawStartsCritical.find((*ci)->GetAid()) == rawStartsCritical.end())
+    					 {
+    						 //didn't find it, add it
+    						 rawStartsCritical.insert(std::pair<uint16_t, std::vector <Time> >((*ci)->GetAid(), std::vector <Time>()));
+    						 rawStartsCritical[(*ci)->GetAid()].push_back (Simulator::Now() + MilliSeconds (1)); //to add some compensation because I normally don't compare with >=
+    					 }
+    					 else
+    					 {
+    						 //found aid, append it's vector
+    						 rawStartsCritical[(*ci)->GetAid()].push_back(Simulator::Now() + MilliSeconds (1));
+    					 }
+    				 }
+    				 n++;
+    			 }
+    		 }
+    		 else
+    		 {
+    			 //couldn't calculate sta's interval because never received, maybe it didn't have the opportunity?
+    			 //assign a slot to it
+    			 rawStartsCritical.insert(std::pair<uint16_t, std::vector <Time> >((*ci)->GetAid(), std::vector <Time>()));
+    			 rawStartsCritical[(*ci)->GetAid()].push_back (Simulator::Now() + MilliSeconds (2));
+    		 }
+    	 }
+    	 std::map<uint16_t, std::vector <Time> >::iterator it;
+    	 for (it = rawStartsCritical.begin(); it != rawStartsCritical.end(); it++)
+    	 {
+    		 NS_LOG_UNCOND ("o AID=" << (int)it->first);
+    		 for (int i = 0; i < it->second.size(); i++)
+    		 {
+    			 std::cout << ", " << it->second[i];
+    		 }
+    		 std::cout << std::endl;
+    	 }
 
-    	 //AssignRawToCriticalStations ();
+    	 AssignRawToCriticalStations (rawStartsCritical);
     	 // I've populated m_criticalStations, m_aidListPaged, m_aidList;
     	 // I have to determine m_tInterval, m_tEnqMin etc for RAW assignment
 
@@ -1421,10 +1549,136 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 
 }
 
+uint32_t
+S1gRawCtr::GetDlSlotCount (void) const
+{
+	return 30;
+}
+
+Time
+S1gRawCtr::GetDlSlotDuration (void) const
+{
+	return MicroSeconds (500 + 120 * GetDlSlotCount ());
+}
+
+uint32_t
+S1gRawCtr::GetUlSlotCount (void) const
+{
+	return 30;
+}
+
+Time
+S1gRawCtr::GetUlSlotDuration (void) const
+{
+	return MicroSeconds (500 + 120 * GetUlSlotCount ());
+}
+
 void
-S1gRawCtr::AssignRawToCriticalStations ()
+S1gRawCtr::AssignRawToCriticalStations (std::map<uint16_t, std::vector <Time> > rawStartsCritical)
 {
 	//sort stations according to newRAW
+	std::map<uint16_t, std::vector <Time> > rawStartsUlDlCritical;
+	std::map<uint16_t, std::vector <Time> >::iterator it;
+	for (it = rawStartsCritical.begin(); it != rawStartsCritical.end(); it++)
+	{
+		uint16_t aid = it->first;
+		for (int j=0; j < rawStartsCritical[aid].size(); j++)
+		{
+			if (rawStartsUlDlCritical.find(aid) != rawStartsUlDlCritical.end())
+			{
+				rawStartsUlDlCritical[aid].push_back(it->second[j]);
+				//see how many enqueued packets I have for this STA and make sure DL slot is long enough to deliver them all
+			}
+			else
+			{
+				rawStartsUlDlCritical.insert(std::pair<uint16_t, std::vector <Time> >(aid, std::vector <Time>()));
+				rawStartsUlDlCritical[aid].push_back(it->second[j]);
+			}
+			// add DL slot after each UL slot, unless it will exceed the BI
+			if (it->second[j] + MilliSeconds (11) + GetDlSlotDuration () <= Simulator::Now() + MicroSeconds(this->m_beaconInterval))
+				rawStartsUlDlCritical[aid].push_back(it->second[j] + MilliSeconds (11));
+		}
+	}
+
+	//populate startTime_countMap
+	//0,2,4,6,... are UL slots
+	//1,3,5,7,... are DL slots
+	std::map <Time, uint32_t> startTime_countMap;
+	std::map <Time, uint32_t>::iterator stcIt = startTime_countMap.begin();
+	for (it = rawStartsUlDlCritical.begin(); it != rawStartsUlDlCritical.end(); it++)
+	{
+		uint16_t aid = it->first;
+		int count (1);
+		Time prev = Time ();
+		for (int j=0; j < it->second.size(); j++)
+		{
+			if (j % 2 == 0)
+			{
+				count = prev == it->second[j] ? count + 1 : 1; //number of UL packets enqueued before now
+				prev = it->second[j];
+			}
+
+			if (startTime_countMap.find(it->second[j]) != startTime_countMap.end() && count == 1)
+			{
+				//exists
+				int n = 0;
+				while (startTime_countMap.find(it->second[j] + n * MilliSeconds(2)) != startTime_countMap.end())
+				{
+					n++;
+					//auto glambda = [&aid](const SensorActuator *a) {return a->GetAid() == aid; };
+					auto ci = std::find_if(m_criticalStations.begin(), m_criticalStations.end(), [&aid](const SensorActuator *a) {return a->GetAid() == aid;});
+					SensorActuator *sta = *ci;
+					if (n * MilliSeconds(2) + GetDlSlotDuration() >= sta->m_tInterval && sta->m_tInterval > Time ())
+					{
+						NS_LOG_UNCOND ("ne mogu fino dodijeliti slot jer mi DL slot prelazi novi UL slot. Nisam to rijesila pa prekidam tu program ako se desi.");
+						NS_ASSERT (false);
+					}
+				}
+				it->second[j] += n * MilliSeconds(2);
+				/*Time tTrialAfter = startTime_countMap.find(it->second[j])->first +
+						MicroSeconds (500 + 120 * startTime_countMap.find(it->second[j])->second);
+				if (tTrialAfter)*/
+				startTime_countMap.insert(std::pair<Time, uint32_t>(it->second[j], j % 2 == 0 ? GetUlSlotCount() : GetDlSlotCount()));
+				stcIt = startTime_countMap.end();
+				std::advance (stcIt, -1); //no guarantees that it doesn't ovelap with another slot. This will be solved later
+			}
+			else
+			{
+				//the start time is unique, that's ok (no other stations wanting to start their slot at this time
+				//if count = 2, i already added a slot for the same sta in the prev iteration. Make sure to rewrite that one with longer count, both UL and DL and to
+				if (count == 1)
+				{
+					startTime_countMap.insert(std::pair<Time, uint32_t>(it->second[j], j % 2 == 0 ? GetUlSlotCount() : GetDlSlotCount()));
+					stcIt = startTime_countMap.end();
+					std::advance (stcIt, -1);
+				}
+				else if (count > 1)
+				{
+					if (j % 2 == 0)
+					{
+						std::advance (stcIt, -1);
+						stcIt->second = count * GetUlSlotCount();
+						std::advance (stcIt, 1);
+					}
+					else
+						stcIt->second = count * GetDlSlotCount();
+					//startTime_countMap.at(it->second[j - (count-1)*2]) = j % 2 == 0 ? count * GetUlSlotCount() : count * GetDlSlotCount();
+					//startTime_countMap.insert(std::pair<Time, uint32_t>(it->second[j], j % 2 == 0 ? GetUlSlotCount() : GetDlSlotCount()));
+				}
+			}
+		}
+	}
+
+	//make sure there is no overlapping slots, rearrange if there is
+	int i = 0;
+	std::map <Time, uint32_t>::iterator sti;
+	for (sti = startTime_countMap.begin(); sti != startTime_countMap.end(); sti++)
+	{
+		std::cout << "slot #" << i << ":\t start=" << sti->first << ", duration=" << 500 + 120 * sti->second << "\n";
+		i++;
+	}
+
+	/*
 	std::cout << "BEFORE SORTING:" << std::endl;
 	for (auto s : m_criticalStations)
 	{
@@ -1436,6 +1690,7 @@ S1gRawCtr::AssignRawToCriticalStations ()
 	{
 		std::cout << "aid=" << (int)s->GetAid() <<", oldRawStart=" << s->m_oldRawStart << ", newRawStart=" << s->m_newRawStart <<std::endl;
 	}
+	*/
 }
 
 void

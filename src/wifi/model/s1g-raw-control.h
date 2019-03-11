@@ -105,6 +105,27 @@ private:
     bool m_everSuccess;
 };
     
+class Slot
+{
+public:
+	Slot ();
+	virtual ~Slot ();
+	uint16_t GetAid (void) const;
+	void SetAid (uint16_t aid);
+	uint16_t GetSlotCount (void) const;
+	void SetSlotCount (uint16_t count);
+	Time GetSlotDuration (void) const;
+	Time GetSlotStartTime (void) const;
+	void SetSlotStartTime (Time start);
+private:
+	uint16_t m_assignedAid;
+	uint16_t m_slotCount;
+	Time m_slotStartTime;
+	Time m_slotDuration;
+	uint8_t m_slotFormat;
+
+};
+
 class SensorActuator : public Sensor
 {
 public:
@@ -121,6 +142,8 @@ public:
 	uint64_t m_oldRawStart;
 	uint64_t m_newRawStart;
 
+	Time m_tSent;
+	Time m_tSentPrev;
 	Time m_tInterval;
 	Time m_tIntervalMin;
 	Time m_tIntervalMax;
@@ -186,11 +209,11 @@ public:
   void deleteRps ();
   void UdpateSensorStaInfo (std::vector<uint16_t> m_sensorlist, std::vector<uint16_t> m_receivedAid, std::string outputpath); //need to change, controlled by AP
   void UdpateOffloadStaInfo (std::vector<uint16_t> m_OffloadList, std::vector<uint16_t>  receivedStas, std::string outputpath);
-  void UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::string outputpath);
+  void UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::string outputpath);
 
   void calculateActiveOffloadSta ();
   void SetOffloadAllowedToSend ();
-  void AssignRawToCriticalStations (void);
+  void AssignRawToCriticalStations (std::map<uint16_t, std::vector <Time> > rawStartsCritical);
   void ControlRps (std::vector<uint16_t> criticalList);
   void gandalf();
   void darth();
@@ -204,8 +227,10 @@ public:
   OffloadStation * LookupOffloadSta (uint16_t aid); //can be combined with function LookupSensorSta.
     
   std::vector<uint16_t>::iterator  LookupLastTransmission (uint16_t aid);
-  
-    
+  Time GetDlSlotDuration (void) const;
+  uint32_t GetDlSlotCount (void) const;
+  Time GetUlSlotDuration (void) const;
+  uint32_t GetUlSlotCount (void) const;
     typedef std::vector<Sensor *> Stations;
     typedef std::vector<Sensor *>::iterator StationsCI;
     Stations m_stations;
