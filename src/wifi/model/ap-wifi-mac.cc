@@ -46,6 +46,12 @@
 #include <stdio.h>
 #include <algorithm>
 #include <vector>
+#include "ns3/seq-ts-header.h"
+#include "ns3/trace-helper.h"
+#include "ns3/output-stream-wrapper.h"
+#include "ns3/ipv4-header.h"
+#include "ns3/udp-header.h"
+#include "ns3/llc-snap-header.h"
 
 namespace ns3 {
 
@@ -1402,7 +1408,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		if (this->m_criticalAids.size())
 		{
 			RPS rps;
-			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
+			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
 			UpdateQueues(rps);
 			int i = 0;
 			int oldNumRaws = m_rpsset.rpsset.at(0)->GetNumberOfRawGroups();
@@ -1741,6 +1747,7 @@ void ApWifiMac::SendOneBeacon(void) {
 
 				m_receivedAid.clear();
 				m_receivedTimes.clear();
+				m_sentTimes.clear();
 				m_sentToAids.clear();
 				m_enqueuedToAids.clear();
 			}
@@ -1749,6 +1756,7 @@ void ApWifiMac::SendOneBeacon(void) {
 	} else {
 		m_receivedAid.clear(); //release storage
 		m_receivedTimes.clear();
+		m_sentTimes.clear();
 		m_sentToAids.clear();
 		this->m_enqueuedToAids.clear(); //is this ok? TODO
 		hdr.SetBeacon();
@@ -1968,6 +1976,22 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 			Mac48Address to = hdr->GetAddr3();
 			if (to == GetAddress()) {
 				NS_LOG_DEBUG("frame for me from=" << from << " at " << Simulator::Now());
+				auto p_copy = packet->Copy();
+				/*AsciiTraceHelper ascii;
+				Ptr<OutputStreamWrapper> stream = ascii.CreateFileStream("packetdata");
+				packet->Print(*stream->GetStream());*/
+				//deep packet inspection to read Ts when packet is sent by the application
+				LlcSnapHeader llc;
+				p_copy->RemoveHeader(llc);
+				Ipv4Header ipv4Header;
+				p_copy->RemoveHeader(ipv4Header);
+				UdpHeader udpHeader;
+				p_copy->RemoveHeader(udpHeader);
+				SeqTsHeader seqTs;
+				p_copy->RemoveHeader(seqTs);
+				Time sentAt = seqTs.GetTs();
+				//NS_LOG_UNCOND ("******** sentAt=" << sentAt);
+				m_sentTimes.push_back(sentAt);
 				if (hdr->IsQosData()) {
 					if (hdr->IsQosAmsdu()) {
 						NS_LOG_DEBUG(
