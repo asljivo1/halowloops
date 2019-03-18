@@ -42,6 +42,7 @@ void
 RPS::RawAssignment::SetRawControl (uint8_t control)
 {
   m_rawcontrol = control;
+  //this->SetRawTypeIndex(control & 0x03);
 }
 
 void
@@ -462,7 +463,7 @@ RPS::GetRawAssigmentObj(uint32_t raw_index) const {
 	uint16_t slotNum=0;
 	uint64_t currentRAW_start=0;*/
 
-	uint8_t rawtypeindex = rawassign[raw_index*rawAssignment_len+0] & 0x07;
+	uint8_t rawtypeindex = rawassign[raw_index*rawAssignment_len+0] & 0x03;
 	ass.SetRawTypeIndex(rawtypeindex); //TODO check 0
 
 	uint16_t rawslot;
