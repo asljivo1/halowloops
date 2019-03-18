@@ -106,7 +106,7 @@ public:
   /**
      * Get i-th Station's AID.
    */
-    uint32_t GetAID (uint32_t i) const;
+    uint32_t GetAID (uint32_t i = 0) const;
 
     /*
      * Get all station's AIDs.
@@ -115,7 +115,8 @@ public:
 private:
     uint32_t m_staType;
     uint32_t m_channelWidth;
-    Time m_currentslotDuration;
+    std::vector<Time> m_currentslotDuration;
+    int m_slotCounter;
   /**
    * The current MAC state of the STA.
    */
