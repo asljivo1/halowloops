@@ -141,5 +141,6 @@ struct Configuration {
 
 	Configuration();
 	Configuration(int argc, char *argv[]);
+	~Configuration();
 
 };

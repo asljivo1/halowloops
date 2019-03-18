@@ -1425,7 +1425,7 @@ void printStatsToFile (bool print)
 				for (map<uint64_t, Time>::const_iterator it = stats.get(i).rxEndTimeMap.begin(); it != stats.get(i).rxEndTimeMap.end(); ++it)
 					os << it->second.GetMicroSeconds() << " ";
 				os << endl;*/ // These values are equal to the m_receivedTimeBySeqClient
-				os << "dT =\n";
+				os << "dT [us]=\n";
 				std::cout << "dT =\n";
 				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_receivedTimeBySeqClient.begin(), jt = --stats.get(i).m_receivedTimeBySeqClient.end(); it != jt; ++it)
 				{
@@ -1584,13 +1584,13 @@ void PhyStateTrace(std::string context, Time start, Time duration,
 }
 
 int main(int argc, char *argv[]) {
-	PacketMetadata::Enable();
+	//PacketMetadata::Enable();
 
 	//LogComponentEnable ("UdpServer", LOG_LEVEL_INFO);
 	//LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
 	//LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
-	/*LogComponentEnable ("CoapClient", LOG_LEVEL_INFO);
-	LogComponentEnable ("CoapServer", LOG_LEVEL_INFO);*/
+	LogComponentEnable ("CoapClient", LOG_LEVEL_INFO);
+	LogComponentEnable ("CoapServer", LOG_LEVEL_INFO);
 
 	LogComponentEnable ("ApWifiMac", LOG_LEVEL_INFO);
 	LogComponentEnable ("StaWifiMac", LOG_LEVEL_INFO);
