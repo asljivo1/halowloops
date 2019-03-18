@@ -82,7 +82,21 @@ public:
     uint16_t m_transIntervalListSize;
     
     UpdateInfo m_snesorUpdatInfo;
-    
+    //Amina's:
+    uint64_t m_nTx;
+    Time m_tSuccessLast;
+    Time m_tSuccessPreLast;
+
+    uint64_t m_oldRawStart;
+    uint64_t m_newRawStart;
+
+    Time m_tSent;
+    Time m_tSentPrev;
+    Time m_tInterval;
+    Time m_tIntervalMin;
+    Time m_tIntervalMax;
+
+    Time m_tEnqMin;
 private:
     uint64_t m_transmissionInterval; // beacon as unit
     uint64_t m_transInOneBeacon; // beacon as unit
@@ -103,6 +117,8 @@ private:
     uint16_t m_index;
     
     bool m_everSuccess;
+
+
 };
     
 class Slot
@@ -112,13 +128,21 @@ public:
 	virtual ~Slot ();
 	uint16_t GetAid (void) const;
 	void SetAid (uint16_t aid);
+	uint16_t GetStartAid (void) const;
+	void SetStartAid (uint16_t aid);
+	uint16_t GetEndAid (void) const;
+	void SetEndAid (uint16_t aid);
 	uint16_t GetSlotCount (void) const;
 	void SetSlotCount (uint16_t count);
 	Time GetSlotDuration (void) const;
 	Time GetSlotStartTime (void) const;
 	void SetSlotStartTime (Time start);
+	uint8_t GetSlotFormat (void) const;
+	void SetSlotFormat (uint8_t format);
 private:
 	uint16_t m_assignedAid;
+	uint16_t m_startAid;
+	uint16_t m_endAid;
 	uint16_t m_slotCount;
 	Time m_slotStartTime;
 	Time m_slotDuration;
@@ -210,15 +234,16 @@ public:
   void UdpateSensorStaInfo (std::vector<uint16_t> m_sensorlist, std::vector<uint16_t> m_receivedAid, std::string outputpath); //need to change, controlled by AP
   void UdpateOffloadStaInfo (std::vector<uint16_t> m_OffloadList, std::vector<uint16_t>  receivedStas, std::string outputpath);
   void UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::string outputpath);
-
+  void UpdateSensorStaInfo (std::vector<uint16_t> sensorList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes);
   void calculateActiveOffloadSta ();
   void SetOffloadAllowedToSend ();
-  void AssignRawToCriticalStations (std::map<uint16_t, std::vector <Time> > rawStartsCritical);
+  void DistributeStationsToRaws ();
   void ControlRps (std::vector<uint16_t> criticalList);
   void gandalf();
   void darth();
   void calculateRawSlotDuration (uint16_t numsta, uint16_t successprob); //nedd to be extended to support more felxibility.
-
+  Time GetProcessingTime (void) const;
+  Time GetSoonestSlotStartTime (std::vector<Slot> allSlots, uint16_t minCount, uint16_t aid) const;
   void calculateSensorNumWantToSend (void);
   void calculateMaybeAirtime (void);
   void SetSensorAllowedToSend (void);
@@ -234,7 +259,7 @@ public:
     typedef std::vector<Sensor *> Stations;
     typedef std::vector<Sensor *>::iterator StationsCI;
     Stations m_stations;
-    
+    Stations m_sensorStations;
     typedef std::vector<SensorActuator *> CriticalStations;
     typedef std::vector<SensorActuator *>::iterator CriticalStationsCI;
     CriticalStations m_criticalStations;
@@ -243,7 +268,7 @@ public:
     typedef std::vector<OffloadStation *>::iterator OffloadStationsCI;
     OffloadStations m_offloadStations;
     
-    
+    std::vector<Slot> m_allSlots;
     uint16_t MaxSlotForSensor;
     
     std::vector<uint16_t> m_aidListPaged;
