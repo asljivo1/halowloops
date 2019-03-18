@@ -71,6 +71,7 @@ Slot::~Slot ()
 uint16_t
 Slot::GetAid (void) const
 {
+	NS_ASSERT (m_startAid == m_endAid);
 	return m_assignedAid;
 }
 
@@ -79,6 +80,34 @@ Slot::SetAid (uint16_t aid)
 {
 	NS_ASSERT (aid > 0 && aid < 8192);
 	m_assignedAid = aid;
+	m_startAid = aid;
+	m_endAid = aid;
+}
+
+uint16_t
+Slot::GetStartAid (void) const
+{
+	return m_startAid;
+}
+
+void
+Slot::SetStartAid (uint16_t aid)
+{
+	NS_ASSERT (aid > 0 && aid < 8192);
+	m_startAid = aid;
+}
+
+uint16_t
+Slot::GetEndAid (void) const
+{
+	return m_endAid;
+}
+
+void
+Slot::SetEndAid (uint16_t aid)
+{
+	NS_ASSERT (aid > 0 && aid < 8192);
+	m_endAid = aid;
 }
 
 uint16_t
@@ -92,6 +121,19 @@ Slot::SetSlotCount (uint16_t count)
 {
 	NS_ASSERT((!m_slotFormat & (count < 256)) || (m_slotFormat & (count < 2048)));
 	m_slotCount = count;
+}
+
+uint8_t
+Slot::GetSlotFormat (void) const
+{
+	return m_slotFormat;
+}
+
+void
+Slot::SetSlotFormat (uint8_t format)
+{
+	NS_ASSERT (format < 2);
+	m_slotFormat = format;
 }
 
 Time
@@ -295,6 +337,85 @@ S1gRawCtr::~S1gRawCtr ()
 }
 
 void
+S1gRawCtr::UpdateSensorStaInfo (std::vector<uint16_t> sensorList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes)
+{
+	for (std::vector<uint16_t>::iterator ci = sensorList.begin(); ci != sensorList.end(); ci++)
+	{
+		if (LookupSensorSta (*ci) == nullptr)
+		{
+			Sensor *sta = new Sensor;
+			sta->SetAid (*ci);
+			sta->SetNumPacketsReceived(0);
+			m_sensorStations.push_back (sta);
+		}
+	}
+	bool disassoc;
+	StationsCI itcheck = m_sensorStations.begin();
+	for (uint16_t i = 0; i < m_sensorStations.size(); i++)
+	{
+		disassoc = true;
+		for (std::vector<uint16_t>::iterator ci = sensorList.begin(); ci != sensorList.end(); ci++)
+		{
+			if ((*itcheck)->GetAid ()  == *ci)
+			{
+				disassoc = false;
+				if (i < m_sensorStations.size() - 1)
+					itcheck++;
+				break;
+			}
+		}
+
+		if (disassoc == true)
+		{
+			NS_LOG_UNCOND ( "Aid " << (*itcheck)->GetAid () << " erased from m_sensorStations since disassociated");
+			m_sensorStations.erase(itcheck);
+		}
+	}
+	for (std::vector<uint16_t>::iterator ci = receivedFromAids.begin(); ci != receivedFromAids.end(); ci++)
+	{
+		bool match = false;
+		for (std::vector<uint16_t>::iterator it = m_aidList.begin(); it != m_aidList.end(); it++)
+		{
+			if (*ci == *it)
+			{
+				match = true;
+				break;
+			}
+		}
+		uint16_t nTX = 0;
+		Sensor * stationTransmit = LookupSensorSta (*ci);
+		if (stationTransmit != nullptr && !match)
+		{
+			m_aidList.push_back (*ci);
+			if (m_prevRps && m_prevRps->GetNumAssignedRaws(*ci))
+				stationTransmit->m_oldRawStart = this->m_prevRps->GetRawSlotStartFromAid(*ci);
+			//NS_LOG_UNCOND ("+++++++++aid=" << *ci <<", m_oldRawStart = " << stationTransmit->m_oldRawStart);
+			for (int i = 0; i < receivedFromAids.size(); i++)
+			{
+				if (*ci == receivedFromAids[i])
+				{
+					stationTransmit->m_nTx=++nTX;
+					stationTransmit->m_tSuccessPreLast = stationTransmit->m_tSuccessLast;
+					stationTransmit->m_tSuccessLast = receivedTimes[i];
+					stationTransmit->m_tSentPrev = stationTransmit->m_tSent;
+					stationTransmit->m_tSent = sentTimes[i];
+					if (stationTransmit->m_tSentPrev != Time ())
+					{
+						if (stationTransmit->m_tInterval == Time ())
+							stationTransmit->m_tInterval = stationTransmit->m_tSent - stationTransmit->m_tSentPrev;
+
+					}
+					//NS_LOG_UNCOND ("*****aid=" << *ci << ", m_tInterval=" << stationTransmit->m_tInterval << ", m_tSent=" << stationTransmit->m_tSent << ", m_tSentPrev=" << stationTransmit->m_tSentPrev);
+					//NS_LOG_UNCOND ("m_tSuccessLast=" << stationTransmit->m_tSuccessLast << ", m_tSuccessPreLast=" << stationTransmit->m_tSuccessPreLast << ", m_nTx=" << stationTransmit->m_nTx);
+				}
+			}
+		}
+	}
+	NS_LOG_UNCOND ("receivedFromAids.size () = " << receivedFromAids.size () << ", m_sensorStations.size() = " << m_sensorStations.size() << ", currentBeacon = " << currentId);
+
+}
+
+void
 S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::string outputpath)
 {
 	for (std::vector<uint16_t>::iterator ci = criticalAids.begin(); ci != criticalAids.end(); ci++)
@@ -317,7 +438,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 			outputfile.open (sensorfile, std::ios::out | std::ios::app);
 			outputfile.close();
 
-			NS_LOG_UNCOND ("initial, aid = " << *ci);
+			//NS_LOG_UNCOND ("initial, aid = " << *ci);
 
 		}
 	}
@@ -339,7 +460,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 
 		if (disassoc == true)
 		{
-			NS_LOG_UNCOND ( "Aid " << (*itcheck)->GetAid () << " erased from m_stations since disassociated");
+			NS_LOG_UNCOND ( "Aid " << (*itcheck)->GetAid () << " erased from m_criticalStations since disassociated");
 			m_criticalStations.erase(itcheck);
 		}
 	}
@@ -492,7 +613,7 @@ S1gRawCtr::UdpateSensorStaInfo (std::vector<uint16_t> m_sensorlist, std::vector<
             outputfile.close();
             //
             m_lastTransmissionList.push_back (*ci);
-            NS_LOG_UNCOND ("initial, aid = " << *ci);
+            //NS_LOG_UNCOND ("initial, aid = " << *ci);
 
         }
     }
@@ -1238,6 +1359,10 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 m_raw->SetRawGroup(rawinfo);
     				 m_raw->SetSlotNum(aid_end - aid_start + 1);
     				 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
+    				 if (count < 256)
+    					 m_raw->SetSlotFormat(0);
+    				 else if (count < 2048)
+    					 m_raw->SetSlotFormat(1);
     				 m_raw->SetSlotDurationCount(count);
     				 m_rps->SetRawAssignment(*m_raw);
     			 }
@@ -1251,6 +1376,10 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 m_raw->SetRawGroup(rawinfo);
     				 m_raw->SetSlotNum(1);
     				 uint32_t count = (m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds() - 500) / 120;
+    				 if (count < 256)
+    					 m_raw->SetSlotFormat(0);
+    				 else if (count < 2048)
+    					 m_raw->SetSlotFormat(1);
     				 m_raw->SetSlotDurationCount(count);
     				 m_rps->SetRawAssignment(*m_raw);
     			 }
@@ -1266,6 +1395,10 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     			 uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | page;
     			 m_raw->SetRawGroup(rawinfo);
     			 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
+    			 if (count < 256)
+    				 m_raw->SetSlotFormat(0);
+    			 else if (count < 2048)
+    				 m_raw->SetSlotFormat(1);
     			 m_raw->SetSlotDurationCount(count);
     			 uint32_t numslots;
     			 m_raw->SetSlotNum(criticalList.size());
@@ -1294,6 +1427,10 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 m_raw->SetRawGroup(rawinfo);
     				 count = (m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds() - m_rps->GetRawAssigmentObj(0).GetSlotDuration().GetMicroSeconds() * m_rps->GetRawAssigmentObj(0).GetSlotNum() - 500) / 120;
     				 //NS_LOG_UNCOND ("--count=" << count);
+    				 if (count < 256)
+    					 m_raw->SetSlotFormat(0);
+    				 else if (count < 2048)
+    					 m_raw->SetSlotFormat(1);
     				 m_raw->SetSlotDurationCount(count);
     				 m_raw->SetSlotNum(1);
     				 m_rps->SetRawAssignment(*m_raw);
@@ -1308,7 +1445,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      else if (m_prevRps != nullptr && criticalList.size())
      {
     	 UpdateCriticalStaInfo (criticalList, receivedFromAids, enqueuedToAids, receivedTimes, sentTimes, outputpath);
-
+    	 UpdateSensorStaInfo (sensorList, receivedFromAids, receivedTimes, sentTimes);
     	 //this->UdpateSensorStaInfo(sensorList, receivedFromAids, outputpath);
 
     	 //not initial, there was a non-empty RPS in the previous beacon but no successful receptions??????
@@ -1341,71 +1478,13 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     		 }
     	 }
     	  */
-    	 std::vector<Slot> allSlots;
-    	 std::map<uint16_t, std::vector <Time> > rawStartsCritical;
-    	 for (CriticalStationsCI ci = this->m_criticalStations.begin(); ci != m_criticalStations.end(); ci++)
-    	 {
-    		 SensorActuator * sta = LookupCriticalSta ((*ci)->GetAid());
-    		 //sta->m_newRawStart = (sta->m_tSent + sta->m_tInterval).GetMicroSeconds();
-    		 if (sta->m_tInterval != Time ())
-    		 {
-    			 uint16_t n (1);
-    			 while (sta->m_tSent + n * sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval))
-    			 {
-    				 if (sta->m_tSent + n * sta->m_tInterval > Simulator::Now())
-    				 {
-    					 if (rawStartsCritical.find((*ci)->GetAid()) == rawStartsCritical.end())
-    					 {
-    						 //didn't find it, add it
-    						 rawStartsCritical.insert(std::pair<uint16_t, std::vector <Time> >((*ci)->GetAid(), std::vector <Time>()));
-    						 rawStartsCritical[(*ci)->GetAid()].push_back (sta->m_tSent + n * sta->m_tInterval);
-    					 }
-    					 else
-    					 {
-    						 //found aid, append it's vector
-    						 rawStartsCritical[(*ci)->GetAid()].push_back(sta->m_tSent + n * sta->m_tInterval );
-    					 }
-    				 }
-    				 else
-    				 {
-    					 //sta->m_tSent + n * sta->m_tInterval is in the past, meaning it wasn't delivered
-    					 //assign a RAW to this station ASAP to allow late packets to be sent
-    					 //NS_LOG_UNCOND ("NOW = " << Simulator::Now());
-    					 if (rawStartsCritical.find((*ci)->GetAid()) == rawStartsCritical.end())
-    					 {
-    						 //didn't find it, add it
-    						 rawStartsCritical.insert(std::pair<uint16_t, std::vector <Time> >((*ci)->GetAid(), std::vector <Time>()));
-    						 rawStartsCritical[(*ci)->GetAid()].push_back (Simulator::Now() + MilliSeconds (1)); //to add some compensation because I normally don't compare with >=
-    					 }
-    					 else
-    					 {
-    						 //found aid, append it's vector
-    						 rawStartsCritical[(*ci)->GetAid()].push_back(Simulator::Now() + MilliSeconds (1));
-    					 }
-    				 }
-    				 n++;
-    			 }
-    		 }
-    		 else
-    		 {
-    			 //couldn't calculate sta's interval because never received, maybe it didn't have the opportunity?
-    			 //assign a slot to it
-    			 rawStartsCritical.insert(std::pair<uint16_t, std::vector <Time> >((*ci)->GetAid(), std::vector <Time>()));
-    			 rawStartsCritical[(*ci)->GetAid()].push_back (Simulator::Now() + MilliSeconds (2));
-    		 }
-    	 }
-    	 std::map<uint16_t, std::vector <Time> >::iterator it;
-    	 for (it = rawStartsCritical.begin(); it != rawStartsCritical.end(); it++)
-    	 {
-    		 NS_LOG_UNCOND ("o AID=" << (int)it->first);
-    		 for (int i = 0; i < it->second.size(); i++)
-    		 {
-    			 std::cout << ", " << it->second[i];
-    		 }
-    		 std::cout << std::endl;
-    	 }
 
-    	 AssignRawToCriticalStations (rawStartsCritical);
+    	 delete m_rps;
+    	 m_rps = new RPS;
+
+
+    	 DistributeStationsToRaws ();
+
     	 // I've populated m_criticalStations, m_aidListPaged, m_aidList;
     	 // I have to determine m_tInterval, m_tEnqMin etc for RAW assignment
 
@@ -1418,33 +1497,21 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
 
      }*/
      currentId++; //beaconInterval counter
-     /*
-     //
-     //work here
-     UdpateSensorStaInfo (m_sensorlist,  m_receivedAid, outputpath);
-     UdpateOffloadStaInfo (m_OffloadList, m_receivedAid, outputpath);
-     //NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppingaa =");
-     currentId++; //next id, actually
-     calculateSensorNumWantToSend ();
-     calculateActiveOffloadSta ();
-     //NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppingbb =");
 
-
-     calculateMaybeAirtime ();
-     //NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppingdd =");
-
-     SetSensorAllowedToSend ();
-     SetOffloadAllowedToSend ();
-
-     //NS_LOG_UNCOND ("S1gRawCtr::UpdateRAWGrouppingcc =");
-     m_rps = new RPS;
-     configureRAW ();
-     RPS m_rpsAP =  GetRPS ();
-     return m_rpsAP;*/
-
-     /*outputfile.open (sensorfile, std::ios::out | std::ios::trunc);
-                 outputfile.close();*/
      ControlRps (criticalList);
+     //std::ofstream coutpom = std::cout;
+     m_rps->Print(std::cout);
+     /*NS_LOG_UNCOND (" +++ ALL SLOTS +++" );
+     	for (auto& s : allSlots)
+     	{
+     		NS_LOG_UNCOND ("startAID-endAID=" << (int)s.GetStartAid() << "-" << (int)s.GetEndAid() << "\t start time=" << s.GetSlotStartTime() << "\t duration=" << s.GetSlotDuration());
+     	}*/
+     std::ofstream pom;
+     std::string strr = "lastrps.txt";
+     pom.open(strr.c_str(), std::ios::out | std::ios::trunc);
+     m_rps->Print(pom);
+     pom.close();
+
      std::ofstream os;
      outputpath += std::to_string(currentId) + ".txt";
      os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
@@ -1488,13 +1555,14 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 	if (this->m_beaconInterval - beaconTxDuration.GetMicroSeconds() < (rawlenCritical + rawlenSensors).GetMicroSeconds())
 	{
 		//raw too large
-		if (rawlenSensors > Time())
+		if (rawlenSensors > Time() && this->m_sensorStations.size() > 0)
 		{
 			Time desiredDurationTotal = MicroSeconds(m_beaconInterval) - beaconTxDuration - rawlenCritical;
+			//NS_LOG_UNCOND ("sensors desiredDurationTotal = " << desiredDurationTotal);
 			int i = 0;
 			bool fixed (false);
 			std::map<int, Time> rawIndexToDurationSensors;
-			while (rawlenSensors > desiredDurationTotal)
+			while (rawlenSensors > desiredDurationTotal && i < m_rps->GetNumberOfRawGroups())
 			{
 				// if not critical
 				if (!(std::find (criticalList.begin(), criticalList.end(), m_rps->GetRawAssigmentObj(i).GetRawGroupAIDStart()) != criticalList.end()))
@@ -1509,6 +1577,10 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 						uint32_t count = (desired.GetMicroSeconds()/m_rps->GetRawAssigmentObj(i).GetSlotNum() - 500) / 120;
 						rawlenSensors -= m_rps->GetRawAssigmentObj(i).GetSlotDuration()*m_rps->GetRawAssigmentObj(i).GetSlotNum() - MicroSeconds(count * 120 + 500) * m_rps->GetRawAssigmentObj(i).GetSlotNum();
 						RPS::RawAssignment newRawAss = m_rps->GetRawAssigmentObj(i);
+						if (count < 256)
+							newRawAss.SetSlotFormat(0);
+						else if (count < 2048)
+							newRawAss.SetSlotFormat(1);
 						newRawAss.SetSlotDurationCount(count);
 						m_rps->ReplaceRawAssignmentAt(newRawAss, i);
 						NS_LOG_UNCOND ("RAW reduced at beacon=" << this->currentId + 1);
@@ -1517,7 +1589,7 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 					}
 					else
 					{
-						NS_LOG_UNCOND ("RAW no." << i << " in beacon no." << this->currentId << " is too short to reduce.");
+						//NS_LOG_UNCOND ("RAW no." << i << " in beacon no." << this->currentId << " is too short to reduce.");
 						rawIndexToDurationSensors.insert(std::pair<int, Time>(i, currentRawDuration));
 					}
 				}
@@ -1526,24 +1598,53 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 			if (!fixed)
 			{
 				NS_ASSERT (!rawIndexToDurationSensors.empty()); //if this is empty, critical RAWs are too long and I cannot shrink them. Too many control loops!
-				double coef = desiredDurationTotal / rawlenSensors;
+				double coef = desiredDurationTotal.GetNanoSeconds() * 1.0 / rawlenSensors.GetNanoSeconds();
+				//NS_LOG_UNCOND ("++coef=" << coef);
 				for (std::map<int, Time>::iterator it = rawIndexToDurationSensors.begin(); it != rawIndexToDurationSensors.end(); it++)
 				{
-					Time scaledRawDuration = coef * (*it).second;
+					double scaledRawDuration = coef * (*it).second.GetMicroSeconds();
 					//TODO Slot durations are shrinked now. It could happen that slots are too short for 1 TX. I didn't handle this case
 					//In that case we should reduce the number of slots in order to increase the slot duration
-					uint16_t scaledCount = (scaledRawDuration.GetMicroSeconds() / m_rps->GetRawAssigmentObj((*it).first).GetSlotNum()- 500) / 120;
+					uint16_t scaledCount = (scaledRawDuration / m_rps->GetRawAssigmentObj((*it).first).GetSlotNum()- 500) / 120;
 					RPS::RawAssignment newRawAss = m_rps->GetRawAssigmentObj((*it).first);
+					if (scaledCount < 256)
+						newRawAss.SetSlotFormat(0);
+					else if (scaledCount < 2048)
+						newRawAss.SetSlotFormat(1);
+					//NS_LOG_UNCOND ("scaled count = " << (int)scaledCount << ", format = " << (int)newRawAss.GetSlotFormat());
 					newRawAss.SetSlotDurationCount(scaledCount);
 					m_rps->ReplaceRawAssignmentAt(newRawAss, (*it).first);
-					NS_LOG_UNCOND ("Multiple RAWs reduced at beacon=" << this->currentId + 1);
+					//NS_LOG_UNCOND ("Multiple RAWs scaled down at beacon=" << this->currentId + 1);
 				}
 			}
 		}
-		else if (rawlenCritical > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
+		else if (rawlenCritical.GetMicroSeconds() > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
 		{
-			NS_LOG_UNCOND ("Critical RAWs take more channel time than available. Reduce number of loops!");
-			NS_ASSERT (false);
+			//NS_LOG_UNCOND ("Critical RAWs take more channel time than available. Reduce number of loops!");
+			while (rawlenCritical.GetMicroSeconds() > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
+			{
+				//delete one of the most freqent RAWs
+				std::vector<uint16_t> counts;
+				for (auto& aid : criticalList)
+				{
+					counts.push_back(std::count_if(this->m_allSlots.begin(), this->m_allSlots.end(), [&aid](Slot& a){return a.GetAid() == aid;}));
+				}
+				auto mostFreqRawIt = std::max_element(counts.begin(), counts.end());
+				int mostFreqRawIndex = std::distance(counts.begin(), mostFreqRawIt);
+				int aidToDelete = criticalList[mostFreqRawIndex];
+				//find the last RAW with that AID
+				for (int i = m_rps->GetNumberOfRawGroups() - 1; i >= 0 ; i--)
+				{
+					if (m_rps->GetRawAssigmentObj(i).GetRawGroupAIDStart() == aidToDelete)
+					{
+						rawlenCritical -= m_rps->GetRawAssigmentObj(i).GetSlotDuration() * m_rps->GetRawAssigmentObj(i).GetSlotNum();
+						m_allSlots.erase(m_allSlots.begin()+i);
+						m_rps->DeleteRawAssigmentObj(i);
+						break;
+					}
+				}
+			}
+			//NS_ASSERT (false);
 		}
 	}
 
@@ -1552,7 +1653,7 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 uint32_t
 S1gRawCtr::GetDlSlotCount (void) const
 {
-	return 30;
+	return 10;
 }
 
 Time
@@ -1564,7 +1665,7 @@ S1gRawCtr::GetDlSlotDuration (void) const
 uint32_t
 S1gRawCtr::GetUlSlotCount (void) const
 {
-	return 30;
+	return 10;
 }
 
 Time
@@ -1573,124 +1674,302 @@ S1gRawCtr::GetUlSlotDuration (void) const
 	return MicroSeconds (500 + 120 * GetUlSlotCount ());
 }
 
-void
-S1gRawCtr::AssignRawToCriticalStations (std::map<uint16_t, std::vector <Time> > rawStartsCritical)
+Time
+S1gRawCtr::GetProcessingTime (void) const
 {
-	//sort stations according to newRAW
-	std::map<uint16_t, std::vector <Time> > rawStartsUlDlCritical;
-	std::map<uint16_t, std::vector <Time> >::iterator it;
-	for (it = rawStartsCritical.begin(); it != rawStartsCritical.end(); it++)
-	{
-		uint16_t aid = it->first;
-		for (int j=0; j < rawStartsCritical[aid].size(); j++)
-		{
-			if (rawStartsUlDlCritical.find(aid) != rawStartsUlDlCritical.end())
-			{
-				rawStartsUlDlCritical[aid].push_back(it->second[j]);
-				//see how many enqueued packets I have for this STA and make sure DL slot is long enough to deliver them all
-			}
-			else
-			{
-				rawStartsUlDlCritical.insert(std::pair<uint16_t, std::vector <Time> >(aid, std::vector <Time>()));
-				rawStartsUlDlCritical[aid].push_back(it->second[j]);
-			}
-			// add DL slot after each UL slot, unless it will exceed the BI
-			if (it->second[j] + MilliSeconds (11) + GetDlSlotDuration () <= Simulator::Now() + MicroSeconds(this->m_beaconInterval))
-				rawStartsUlDlCritical[aid].push_back(it->second[j] + MilliSeconds (11));
-		}
-	}
+	return MilliSeconds (10);
+}
 
-	//populate startTime_countMap
-	//0,2,4,6,... are UL slots
-	//1,3,5,7,... are DL slots
-	std::map <Time, uint32_t> startTime_countMap;
-	std::map <Time, uint32_t>::iterator stcIt = startTime_countMap.begin();
-	for (it = rawStartsUlDlCritical.begin(); it != rawStartsUlDlCritical.end(); it++)
+void
+S1gRawCtr::DistributeStationsToRaws ()
+{
+	std::vector<Slot> criticalSlots;
+	for (CriticalStationsCI ci = this->m_criticalStations.begin(); ci != m_criticalStations.end(); ci++)
 	{
-		uint16_t aid = it->first;
-		int count (1);
-		Time prev = Time ();
-		for (int j=0; j < it->second.size(); j++)
+		SensorActuator * sta = LookupCriticalSta ((*ci)->GetAid());
+		//AASIGN ASAP RAW IS PAGED OR EXTEND EXISTING ONE TAKE INTO ACCOUTN PENDING DLPACKETS
+		auto aid = (*ci)->GetAid();
+		if (sta->m_tInterval != Time ())
 		{
-			if (j % 2 == 0)
+			uint16_t n (1);
+			while (sta->m_tSent + n * sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval))
 			{
-				count = prev == it->second[j] ? count + 1 : 1; //number of UL packets enqueued before now
-				prev = it->second[j];
-			}
-
-			if (startTime_countMap.find(it->second[j]) != startTime_countMap.end() && count == 1)
-			{
-				//exists
-				int n = 0;
-				while (startTime_countMap.find(it->second[j] + n * MilliSeconds(2)) != startTime_countMap.end())
+				if (sta->m_tSent + n * sta->m_tInterval > Simulator::Now())
 				{
-					n++;
-					//auto glambda = [&aid](const SensorActuator *a) {return a->GetAid() == aid; };
-					auto ci = std::find_if(m_criticalStations.begin(), m_criticalStations.end(), [&aid](const SensorActuator *a) {return a->GetAid() == aid;});
-					SensorActuator *sta = *ci;
-					if (n * MilliSeconds(2) + GetDlSlotDuration() >= sta->m_tInterval && sta->m_tInterval > Time ())
-					{
-						NS_LOG_UNCOND ("ne mogu fino dodijeliti slot jer mi DL slot prelazi novi UL slot. Nisam to rijesila pa prekidam tu program ako se desi.");
-						NS_ASSERT (false);
-					}
+					Slot s;
+					s.SetAid(aid);
+					s.SetSlotStartTime(sta->m_tSent + n * sta->m_tInterval);
+					if (GetUlSlotCount() < 256)
+						s.SetSlotFormat(0);
+					else if (GetUlSlotCount() < 2048)
+						s.SetSlotFormat(1);
+					s.SetSlotCount(GetUlSlotCount());
+					criticalSlots.push_back(s);
+					//DL
+					s.SetSlotStartTime(sta->m_tSent + n * sta->m_tInterval + GetProcessingTime() + MilliSeconds (1));
+					if (GetDlSlotCount() < 256)
+						s.SetSlotFormat(0);
+					else if (GetDlSlotCount() < 2048)
+						s.SetSlotFormat(1);
+					s.SetSlotCount(this->GetDlSlotCount());
+					if (s.GetSlotStartTime() + s.GetSlotDuration() < Simulator::Now() + MicroSeconds(this->m_beaconInterval))
+						criticalSlots.push_back(s);
 				}
-				it->second[j] += n * MilliSeconds(2);
-				/*Time tTrialAfter = startTime_countMap.find(it->second[j])->first +
-						MicroSeconds (500 + 120 * startTime_countMap.find(it->second[j])->second);
-				if (tTrialAfter)*/
-				startTime_countMap.insert(std::pair<Time, uint32_t>(it->second[j], j % 2 == 0 ? GetUlSlotCount() : GetDlSlotCount()));
-				stcIt = startTime_countMap.end();
-				std::advance (stcIt, -1); //no guarantees that it doesn't ovelap with another slot. This will be solved later
-			}
-			else
-			{
-				//the start time is unique, that's ok (no other stations wanting to start their slot at this time
-				//if count = 2, i already added a slot for the same sta in the prev iteration. Make sure to rewrite that one with longer count, both UL and DL and to
-				if (count == 1)
+				else
 				{
-					startTime_countMap.insert(std::pair<Time, uint32_t>(it->second[j], j % 2 == 0 ? GetUlSlotCount() : GetDlSlotCount()));
-					stcIt = startTime_countMap.end();
-					std::advance (stcIt, -1);
-				}
-				else if (count > 1)
-				{
-					if (j % 2 == 0)
+					//sta->m_tSent + n * sta->m_tInterval is in the past, meaning it wasn't delivered
+					//assign a RAW to this station at next TBTT + 1ms to allow late packets to be sent
+					//Time sst = Simulator::Now() + MilliSeconds (1);
+					Time sst = GetSoonestSlotStartTime (criticalSlots, this->GetUlSlotCount(), aid);
+					auto slotIt = std::find_if (criticalSlots.begin(), criticalSlots.end(), [&aid, &sst](const Slot s){return s.GetAid() == aid && s.GetSlotStartTime() == sst;});
+					if (slotIt == criticalSlots.end())
 					{
-						std::advance (stcIt, -1);
-						stcIt->second = count * GetUlSlotCount();
-						std::advance (stcIt, 1);
+						//no previous attempts to add a slot to aid that starts at sst
+						//see if that slot is added to some other AID
+						// FORCE PAGING HERE TODO
+						Slot s;
+						s.SetAid(aid);
+						//sst = GetSoonestSlotStartTime (allSlots, GetUlSlotCount() + sta->m_pendingDownlinkPackets * GetDlSlotCount(), aid);
+						s.SetSlotStartTime(sst);
+						uint16_t count;
+						if (n == 1)
+							count= this->GetUlSlotCount() + sta->m_pendingDownlinkPackets * this->GetDlSlotCount();
+						else
+							count = GetUlSlotCount();
+						if (count < 256)
+							s.SetSlotFormat(0);
+						else if (count < 2048)
+							s.SetSlotFormat(1);
+						s.SetSlotCount(count);
+						//sta->m_pendingDownlinkPackets = 0;
+						sta->m_paged = true;
+						criticalSlots.push_back(s);
+						//DL
+						s.SetSlotStartTime(sst + GetProcessingTime() + MilliSeconds (1));
+						//count = GetDlSlotCount();
+						if (count < 256)
+							s.SetSlotFormat(0);
+						else if (count < 2048)
+							s.SetSlotFormat(1);
+						s.SetSlotCount(count);
+						if (s.GetSlotStartTime() + s.GetSlotDuration() < Simulator::Now() + MicroSeconds(this->m_beaconInterval))
+							criticalSlots.push_back(s);
 					}
 					else
-						stcIt->second = count * GetDlSlotCount();
-					//startTime_countMap.at(it->second[j - (count-1)*2]) = j % 2 == 0 ? count * GetUlSlotCount() : count * GetDlSlotCount();
-					//startTime_countMap.insert(std::pair<Time, uint32_t>(it->second[j], j % 2 == 0 ? GetUlSlotCount() : GetDlSlotCount()));
+					{
+						//already added slot to aid that starts at sst, do not add another slot but extend the existing one
+						uint16_t count = GetUlSlotCount() + slotIt->GetSlotCount();
+						if (count < 256)
+							slotIt->SetSlotFormat(0);
+						else if (count < 2048)
+							slotIt->SetSlotFormat(1);
+						slotIt->SetSlotCount(count);
+						Time dlSst = sst + GetProcessingTime() + MilliSeconds (1);
+						auto dlSlotIt = std::find_if (criticalSlots.begin(), criticalSlots.end(), [&aid, &dlSst](const Slot s){return s.GetAid() == aid && s.GetSlotStartTime() == dlSst;});
+						if (dlSlotIt != criticalSlots.end())
+						{
+							count = GetDlSlotCount() + dlSlotIt->GetSlotCount();
+							if (count < 256)
+								dlSlotIt->SetSlotFormat(0);
+							else if (count < 2048)
+								dlSlotIt->SetSlotFormat(1);
+							dlSlotIt->SetSlotCount(count);
+						}
+						else
+						{
+							Slot s;
+							s.SetAid(slotIt->GetAid());
+							s.SetSlotStartTime(dlSst);
+							count = GetDlSlotCount();
+							if (count < 256)
+								s.SetSlotFormat(0);
+							else if (count < 2048)
+								s.SetSlotFormat(1);
+							s.SetSlotCount(count);
+							if (s.GetSlotStartTime() + s.GetSlotDuration() < Simulator::Now() + MicroSeconds(this->m_beaconInterval))
+								criticalSlots.push_back(s);
+						}
+					}
 				}
+				n++;
 			}
+		}
+		else
+		{
+			//couldn't calculate sta's interval because never received, maybe it didn't have the opportunity?
+			//assign a slot to it
+			Slot s;
+			s.SetAid(aid);
+			Time sst = GetSoonestSlotStartTime (criticalSlots, GetUlSlotCount() + 10, aid);
+			s.SetSlotStartTime(sst);
+			auto count = GetUlSlotCount() + 10;
+			if (count < 256)
+				s.SetSlotFormat(0);
+			else if (count < 2048)
+				s.SetSlotFormat(1);
+			s.SetSlotCount(count);
+			criticalSlots.push_back(s);
+		}
+	}
+	std::sort(criticalSlots.begin(), criticalSlots.end(), [](const Slot a, const Slot b){return a.GetSlotStartTime() < b.GetSlotStartTime();});
+	auto allSlots = criticalSlots;
+	//make sure there is no overlapping slots
+	if (m_sensorStations.size() > 0)
+	{
+		uint16_t minaidsensor = (*std::min_element(m_sensorStations.begin(), m_sensorStations.end(), [](const Sensor *a, const Sensor *b){return a->GetAid() < b->GetAid(); }))->GetAid();
+		uint16_t maxaidsensor = (*std::max_element(m_sensorStations.begin(), m_sensorStations.end(), [](const Sensor *a, const Sensor *b){return a->GetAid() < b->GetAid(); }))->GetAid();
+		//NS_LOG_UNCOND ("+min aid sensor=" << (int)minaidsensor << ", max aid sensor=" << maxaidsensor);
+
+		for (int i = 0; i < criticalSlots.size() - 1; i++)
+		{
+			Time end = criticalSlots[i].GetSlotStartTime() + criticalSlots[i].GetSlotDuration();
+			if (end > criticalSlots[i + 1].GetSlotStartTime())
+				criticalSlots[i + 1].SetSlotStartTime(end);
+
+			Time tdiff = criticalSlots[i + 1].GetSlotStartTime() - end;
+
+			if (tdiff >= MicroSeconds(1300))
+			{
+				//assign sensor RAW
+				Slot s;
+				s.SetStartAid(minaidsensor);
+				s.SetEndAid(maxaidsensor);
+				auto count = (tdiff.GetMicroSeconds() - 500) / 120;
+				if (count < 256)
+					s.SetSlotFormat(0);
+				else if (count < 2048)
+					s.SetSlotFormat(1);
+				s.SetSlotCount(count);
+				s.SetSlotStartTime(end);
+				allSlots.push_back(s);
+			}
+		}
+		std::sort(allSlots.begin(), allSlots.end(), [](const Slot a, const Slot b){return a.GetSlotStartTime() < b.GetSlotStartTime();});
+
+		Time end = criticalSlots[criticalSlots.size() - 1].GetSlotStartTime() + criticalSlots[criticalSlots.size() - 1].GetSlotDuration();
+		Time tdiff = Simulator::Now() + MicroSeconds (m_beaconInterval) - end;
+		//NS_LOG_UNCOND ("++last crit RAW ends at = " << end << ", next tbtt=" << Simulator::Now() + MicroSeconds (m_beaconInterval) << ", diff=" << tdiff);
+		//assign Sensors at the end if there is time
+		if (tdiff >= MicroSeconds(1300))
+		{
+			//assign sensor RAW
+			Slot s;
+			s.SetStartAid(minaidsensor);
+			s.SetEndAid(maxaidsensor);
+			auto count = (tdiff.GetMicroSeconds() - 500) / 120;
+			if (count < 256)
+				s.SetSlotFormat(0);
+			else if (count < 2048)
+				s.SetSlotFormat(1);
+			s.SetSlotCount(count);
+			s.SetSlotStartTime(end);
+			allSlots.push_back(s);
+		}
+	}
+	//NS_LOG_UNCOND ("allSlots size = " << allSlots.size() << ", crit slots size=" << criticalSlots.size());
+
+	//if there are concurrent slots with the same start and end AIDs, merge those slots to minimise RAWs
+	//if there are concurrent slots
+	//Slot prevSlot = allSlots[0];
+	for (int h = 0; h < allSlots.size() - 1; h++)
+	{
+		auto nextSlot = allSlots[h+1];
+		if (allSlots[h].GetStartAid() == nextSlot.GetStartAid() && allSlots[h].GetEndAid() == nextSlot.GetEndAid())
+		{
+			Time newDuration = nextSlot.GetSlotStartTime() + nextSlot.GetSlotDuration() - allSlots[h].GetSlotStartTime();
+			uint16_t newcount = (newDuration.GetMicroSeconds() - 500) / 120;
+			if (newcount < 256)
+				allSlots[h].SetSlotFormat(0);
+			else if (newcount < 2048)
+				allSlots[h].SetSlotFormat(1);
+			allSlots[h].SetSlotCount(newcount);
+			allSlots.erase(allSlots.begin() + h + 1);
+			h--;
 		}
 	}
 
-	//make sure there is no overlapping slots, rearrange if there is
-	int i = 0;
-	std::map <Time, uint32_t>::iterator sti;
-	for (sti = startTime_countMap.begin(); sti != startTime_countMap.end(); sti++)
+	/*std::vector<Slot>::iterator it;
+	for (it = allSlots.begin(); it != allSlots.end(); it++)
 	{
-		std::cout << "slot #" << i << ":\t start=" << sti->first << ", duration=" << 500 + 120 * sti->second << "\n";
-		i++;
-	}
+		auto nextit = it;
+		std::advance (nextit, 1);
+		if ((*it).GetStartAid() == (*nextit).GetStartAid() && it != allSlots.end())
+		{
+			Time newDuration = (*nextit).GetSlotStartTime() + (*nextit).GetSlotDuration() - (*it).GetSlotStartTime();
+			uint16_t newcount = (newDuration.GetMicroSeconds() - 500) / 120;
+			if (newcount < 256)
+				(*it).SetSlotFormat(0);
+			else if (newcount < 2048)
+				(*it).SetSlotFormat(1);
+			(*it).SetSlotCount(newcount);
+			allSlots.erase(nextit);
+		}
+	}*/
 
-	/*
-	std::cout << "BEFORE SORTING:" << std::endl;
-	for (auto s : m_criticalStations)
+	/*NS_LOG_UNCOND (" +++ ALL SLOTS +++" );
+	for (auto& s : allSlots)
 	{
-		std::cout << "aid=" << (int)s->GetAid() <<", oldRawStart=" << s->m_oldRawStart << ", newRawStart=" << s->m_newRawStart <<std::endl;
-	}
-	std::sort(m_criticalStations.begin(), m_criticalStations.end(), [](const SensorActuator *a, const SensorActuator *b) {return a->m_newRawStart > b->m_newRawStart; });
-	std::cout << "AFTER SORTING:" << std::endl;
-	for (auto s : m_criticalStations)
+		NS_LOG_UNCOND ("startAID-endAID=" << (int)s.GetStartAid() << "-" << (int)s.GetEndAid() << "\t start time=" << s.GetSlotStartTime() << "\t duration=" << s.GetSlotDuration());
+	}*/
+
+	//ASSIGN SLOTS TO RPS
+	RPS::RawAssignment *m_raw = new RPS::RawAssignment;
+	m_raw->SetRawControl(0);  //support paged STA or not
+	m_raw->SetSlotCrossBoundary(1);
+	for (auto& s : allSlots)
 	{
-		std::cout << "aid=" << (int)s->GetAid() <<", oldRawStart=" << s->m_oldRawStart << ", newRawStart=" << s->m_newRawStart <<std::endl;
+		uint16_t aid_start = s.GetStartAid();
+		uint16_t aid_end = s.GetEndAid();
+		uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | 0x0;
+		m_raw->SetRawGroup(rawinfo);
+		m_raw->SetSlotNum(1);
+		m_raw->SetSlotFormat (s.GetSlotFormat());
+		m_raw->SetSlotDurationCount(s.GetSlotCount());
+		m_rps->SetRawAssignment(*m_raw);
 	}
-	*/
+	delete m_raw;
+	m_allSlots = allSlots;
+}
+
+Time
+S1gRawCtr::GetSoonestSlotStartTime (std::vector<Slot> allSlots, uint16_t minCount, uint16_t aid) const
+{
+	std::vector<Slot>::iterator it;
+	Time startTime = Simulator::Now() + MilliSeconds (1);
+	Time minDuration = MicroSeconds (500 + 120 * minCount);
+	std::sort(allSlots.begin(), allSlots.end(), [](const Slot a, const Slot b){return a.GetSlotStartTime() < b.GetSlotStartTime();});
+
+	for (it = allSlots.begin(); it != allSlots.end(); it++)
+	{
+		if (it->GetSlotStartTime() >= startTime + minDuration)
+			return startTime;
+		else if (it->GetAid() == aid)
+		{
+			auto nextit = it;
+			std::advance(nextit, 1);
+			if (nextit != allSlots.end())
+				if (it->GetSlotStartTime() + it->GetSlotDuration() + minDuration <= nextit->GetSlotStartTime())
+					return it->GetSlotStartTime();
+				else
+				{
+					startTime = nextit->GetSlotStartTime() + nextit->GetSlotDuration();
+					it++;
+				}
+			else if (it->GetSlotStartTime() + it->GetSlotDuration() + minDuration < Simulator::Now() + MicroSeconds (m_beaconInterval))
+				return it->GetSlotStartTime();
+
+		}
+		else
+			startTime = it->GetSlotStartTime() + it->GetSlotDuration();
+	}
+	return startTime;
+	/*NS_LOG_UNCOND ("ALL SLOTS:" );
+	for (auto& s : allSlots)
+	{
+		NS_LOG_UNCOND ("AID=" << (int)s.GetAid() << "\t start ime=" << s.GetSlotStartTime() << "\t duration=" << s.GetSlotDuration());
+	}
+	NS_LOG_UNCOND ("S1gRawCtr::GetSoonestSlotStartTime cannot find any slot for aid=" << (int)aid <<" that is >= wanted minCount=" << (int)minCount);
+	NS_ASSERT (false);*/
 }
 
 void
@@ -1963,7 +2242,7 @@ S1gRawCtr::LookupCriticalSta (uint16_t aid)
 Sensor *
 S1gRawCtr::LookupSensorSta (uint16_t aid)
 {
-   for (StationsCI it = m_stations.begin(); it != m_stations.end(); it++)
+   for (StationsCI it = m_sensorStations.begin(); it != m_sensorStations.end(); it++)
    {
        if (aid == (*it)->GetAid ())
         {
