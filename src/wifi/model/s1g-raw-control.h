@@ -250,7 +250,7 @@ public:
   Sensor * LookupSensorSta (uint16_t aid);
   SensorActuator * LookupCriticalSta (uint16_t aid);
   OffloadStation * LookupOffloadSta (uint16_t aid); //can be combined with function LookupSensorSta.
-    
+  std::vector<uint16_t> GetAidsToForcePage (void) const;
   std::vector<uint16_t>::iterator  LookupLastTransmission (uint16_t aid);
   Time GetDlSlotDuration (void) const;
   uint32_t GetDlSlotCount (void) const;
@@ -270,7 +270,7 @@ public:
     
     std::vector<Slot> m_allSlots;
     uint16_t MaxSlotForSensor;
-    
+    std::vector<uint16_t> m_aidForcePage;
     std::vector<uint16_t> m_aidListPaged;
     std::vector<uint16_t> m_aidList; //stations allowed to transmit in last beacon
     std::vector<uint16_t>::iterator m_aidListCI;

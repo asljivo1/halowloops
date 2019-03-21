@@ -1526,16 +1526,20 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
 void
 S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 {
-	uint32_t beaconSize (27 + 26), numTimPaged (this->m_aidListPaged.size() > 0 ? 1 : 0), pagedSubblocks (0), pageBitmapLen(0);
+	uint32_t beaconSize (27 + 26), pagedSubblocks (0), pageBitmapLen(0);
 
 	// Assumption: only 1 TIM - this will not work for multiple TIMs. Paged subblocks then must be counted separately for each TIM
-	if (m_aidListPaged.size())
+	auto allToPage = m_aidListPaged;
+	allToPage.insert(allToPage.end(), m_aidForcePage.begin(), m_aidForcePage.end());
+	if (allToPage.size())
 	{
-		std::sort(m_aidListPaged.begin(), m_aidListPaged.end());
-		pagedSubblocks = std::unique(m_aidListPaged.begin(), m_aidListPaged.end(), [](const uint16_t a, const uint16_t b){return ((a >> 3) & 0x07) == ((b >> 3) & 0x07); }) - m_aidListPaged.begin();
+		std::sort(allToPage.begin(), allToPage.end());
+		pagedSubblocks = std::unique(allToPage.begin(), allToPage.end(), [](const uint16_t a, const uint16_t b){return ((a >> 3) & 0x07) == ((b >> 3) & 0x07); }) - allToPage.begin();
+
 		pageBitmapLen =1; //TODO this can be 0,1,2,3,4 and should be read from the new page slice that will be constructed in this beacon
 	}
 
+	uint32_t numTimPaged (allToPage.size() > 0 ? 1 : 0);
 	uint32_t rpsSize (2 + 6 * m_rps->GetNumberOfRawGroups());
 	uint32_t timSize (4 + numTimPaged * (1 + 2*31 + pagedSubblocks));
 	uint32_t pageSliceSize (6 + pageBitmapLen);
@@ -1543,7 +1547,7 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 	beaconSize += rpsSize + timSize + pageSliceSize;
 	//Here we assume data rate is 300000 bps, Nss=1 and symbol duration is 40 us
 	Time beaconTxDuration (MicroSeconds (240 + 40 * std::ceil((8 + 6 + 8 * beaconSize) / 12.)));
-	NS_LOG_UNCOND ("+++++beaconTxDuration = " << beaconTxDuration.GetMicroSeconds() << ", beaconSize=" << beaconSize << ", m_aidListPaged.size()=" << m_aidListPaged.size() << ", numTimPaged=" << numTimPaged);
+	NS_LOG_UNCOND ("+++++beaconTxDuration = " << beaconTxDuration.GetMicroSeconds() << ", beaconSize=" << beaconSize << ", allToPage.size()=" << allToPage.size() << ", numTimPaged=" << numTimPaged);
 	Time rawlenCritical (Time (0)), rawlenSensors (Time (0));
 	for (int i = 0; i < this->m_rps->GetNumberOfRawGroups(); i++)
 	{
@@ -1620,7 +1624,7 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 		}
 		else if (rawlenCritical.GetMicroSeconds() > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
 		{
-			//NS_LOG_UNCOND ("Critical RAWs take more channel time than available. Reduce number of loops!");
+			NS_LOG_UNCOND ("Critical RAWs take more channel time than available. Delete the last most freq. RAW");
 			while (rawlenCritical.GetMicroSeconds() > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
 			{
 				//delete one of the most freqent RAWs
@@ -1680,9 +1684,16 @@ S1gRawCtr::GetProcessingTime (void) const
 	return MilliSeconds (10);
 }
 
+std::vector<uint16_t>
+S1gRawCtr::GetAidsToForcePage (void) const
+{
+	return m_aidForcePage;
+}
+
 void
 S1gRawCtr::DistributeStationsToRaws ()
 {
+	m_aidForcePage.clear();
 	std::vector<Slot> criticalSlots;
 	for (CriticalStationsCI ci = this->m_criticalStations.begin(); ci != m_criticalStations.end(); ci++)
 	{
@@ -1691,9 +1702,15 @@ S1gRawCtr::DistributeStationsToRaws ()
 		auto aid = (*ci)->GetAid();
 		if (sta->m_tInterval != Time ())
 		{
+			if (sta->m_tSent + sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval) && std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
+			{
+				//I expect there will be at least 1 TX by sta in the next beacon
+				m_aidForcePage.push_back(sta->GetAid());
+			}
 			uint16_t n (1);
 			while (sta->m_tSent + n * sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval))
 			{
+
 				if (sta->m_tSent + n * sta->m_tInterval > Simulator::Now())
 				{
 					Slot s;

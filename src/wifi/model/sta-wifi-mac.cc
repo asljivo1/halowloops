@@ -594,6 +594,7 @@ StaWifiMac::SendPspollIfnecessary (void)
 				}
 				else
 				{
+					//NS_LOG_UNCOND ("hereeeeeeee");
 					for (uint8_t j = 0; j <= m_selfSubBlock; j++)
 					{
 						if ((blockbitmap & (0x01 << j)))//==1 is incorrect because sometimes it can be 0000 0010 e.g. 2
@@ -605,6 +606,7 @@ StaWifiMac::SendPspollIfnecessary (void)
 					uint8_t subblockind = *partialVBitmap;
 					if ((subblockind & (1 << (m_selfAid & 0x0007))) == 0) //no packet for me
 					{
+						//NS_LOG_UNCOND ("hereeeeeeee 2222222");
 						m_pagedInDtim = false;
 						GoToSleepCurrentTIM(beacon);
 						return;

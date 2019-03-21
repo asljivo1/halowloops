@@ -695,6 +695,7 @@ public:
   typedef void (* TracedCallback)(const WifiMacHeader &header);
 
   uint16_t GetFrameControl (void) const; //for test
+  uint8_t m_ctrlRetry;
 private:
   /**
    * Return the raw Frame Control field.
@@ -741,7 +742,7 @@ private:
   uint8_t m_ctrlToDs;
   uint8_t m_ctrlFromDs;
   uint8_t m_ctrlMoreFrag;
-  uint8_t m_ctrlRetry;
+  //uint8_t m_ctrlRetry;
   uint8_t m_ctrlMoreData;
   uint8_t m_ctrlPowerManagement;
   uint8_t m_ctrlWep;

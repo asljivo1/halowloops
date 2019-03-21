@@ -1202,11 +1202,19 @@ uint8_t ApWifiMac::HasPacketsToBlock(uint16_t blockInd, uint16_t PageInd) {
 				if (HasPacketsInQueueTo(m_AidToMacAddr.find(sta_aid)->second))
 				{
 					blockBitmap = blockBitmap | (1 << i);
-					NS_LOG_DEBUG("[aid=" << sta_aid << "] " << "paged");
+					NS_LOG_DEBUG("[aid=" << sta_aid << "] " << "paged block");
 					staIsActiveDuringCurrentCycle[sta_aid - 1] = true;
 					// if there is at least one station associated with AP that has FALSE for PageSlicingImplemented within this page then m_PageSliceNum = 31
 					if (!m_supportPageSlicingList.at(m_AidToMacAddr[sta_aid]))
 						m_PageSliceNum = 31;
+					break;
+				}
+				else if (std::find(m_aidsForcePage.begin(), m_aidsForcePage.end(), sta_aid) != m_aidsForcePage.end())
+				{
+					//force paging
+					blockBitmap = blockBitmap | (1 << i);
+					NS_LOG_DEBUG("[aid=" << sta_aid << "] " << " force paged block");
+					staIsActiveDuringCurrentCycle[sta_aid - 1] = true;
 					break;
 				}
 				else
@@ -1230,11 +1238,19 @@ uint8_t ApWifiMac::HasPacketsToSubBlock(uint16_t subblockInd, uint16_t blockInd,
 	for (uint16_t j = 0; j <= 7; j++) //8 stations in each subblock
 	{
 		sta_aid = subblock | j;
-		if (m_stationManager->IsAssociated(
-				m_AidToMacAddr.find(sta_aid)->second)) {
-			if (HasPacketsInQueueTo(m_AidToMacAddr.find(sta_aid)->second)) {
+		if (m_stationManager->IsAssociated(m_AidToMacAddr.find(sta_aid)->second))
+		{
+			if (HasPacketsInQueueTo(m_AidToMacAddr.find(sta_aid)->second))
+			{
+				NS_LOG_DEBUG("[aid=" << sta_aid << "] " << " paged sta");
 				subblockBitmap = subblockBitmap | (1 << j);
 				//m_sleepList[m_AidToMacAddr.find(sta_aid)->second] = false;
+			}
+			else if (std::find(m_aidsForcePage.begin(), m_aidsForcePage.end(), sta_aid) != m_aidsForcePage.end())
+			{
+				NS_LOG_DEBUG("[aid=" << sta_aid << "] " << " force paged sta");
+				subblockBitmap = subblockBitmap | (1 << j);
+
 			}
 		}
 	}
@@ -1492,7 +1508,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		{
 			RPS rps;
 			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
-
+			m_aidsForcePage = m_S1gRawCtr.GetAidsToForcePage();
 			UpdateQueues(rps);
 			int i = 0;
 			int oldNumRaws = m_rpsset.rpsset.at(0)->GetNumberOfRawGroups();
@@ -1981,7 +1997,7 @@ void ApWifiMac::OnRAWSlotStart(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 	bool csb =
 			m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(rawGroup - 1).GetSlotCrossBoundary()
 			== 0x01;
-	//std::cout << "OnRawStart Access allowed to targetSlot=" << targetSlot << ", duration=" << slotDuration.GetMicroSeconds() << " us, csb=" << csb << std::endl;
+	std::cout << "OnRawStart Access allowed to targetSlot=" << targetSlot << ", duration=" << slotDuration.GetMicroSeconds() << " us, csb=" << csb << std::endl;
 	//std::cout << "rps=" << (int)rps-1 << ", rawGroup=" << (int)rawGroup-1 << ", slot=" << (int)slot-1 << std::endl;
 	if (m_qosSupported) {
 		NotifyEdcaOfCsb(Simulator::Now(), slotDuration, csb);
@@ -2342,6 +2358,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 		dca->Initialize();
 		ConfigureDcf(dca, 15, 1023, AC_BE_NQOS);
 		m_rawSlotsDca.push_back(dca);
+		//new_rawSlotsDca.push_back(dca);
 
 		EdcaQueues edca;
 		SetupEdcaQueue(AC_VO, edca);
@@ -2352,6 +2369,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 			i->second->Initialize();
 		}
 		m_rawSlotsEdca.push_back(edca);
+		//new_rawSlotsEdca.push_back(edca);
 	}
 
 	std::vector<uint16_t> pagedCpy (m_enqueuedToAids);
@@ -2371,7 +2389,10 @@ ApWifiMac::UpdateQueues (RPS newRps)
 
 	}
 	std::vector<uint16_t>::iterator it = pagedCpy.begin();
-
+	std::cout << "PAGED STATIONS: ";
+	for (auto s : pagedCpy)
+		std::cout << (int)s << "  ";
+	std::cout << std::endl;
 	while ( it != pagedCpy.end())
 	{
 		NS_LOG_UNCOND ("QUEUES paged aid=" << *it);

@@ -580,6 +580,7 @@ EdcaTxopN::NotifyAccessGranted (void)
       m_currentPacket = m_baManager->GetNextPacket (m_currentHdr);
       if (m_currentPacket == 0)
         {
+    	  NS_LOG_DEBUG (" packets need retransmission are stored in BlockAckManager");
           if (m_queue->PeekFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations) == 0)
             {
               NS_LOG_DEBUG ("no available packets in the queue");
@@ -590,9 +591,10 @@ EdcaTxopN::NotifyAccessGranted (void)
               && !m_baManager->ExistsAgreement (m_currentHdr.GetAddr1 (), m_currentHdr.GetQosTid ())
               && SetupBlockAckIfNeeded ())
             {
+        	  NS_LOG_DEBUG (" HEREE");
               return;
             }
-
+          NS_LOG_DEBUG (" HEREE++");
           //temporary, should be removed when ps-poll is suported
           //Ptr<const Packet> PacketTest = m_queue->PeekFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations);
           
@@ -608,7 +610,7 @@ EdcaTxopN::NotifyAccessGranted (void)
         	  //std::cout << "+++NOT CORRECT SLOT" << std::endl;
         	  return;
           }
-
+          NS_LOG_UNCOND (this << " HEREE++++++++++++++");
           /*    if (!(!m_sleepList.find(m_currentHdr.GetAddr1())->second || m_sleepList.size ()== 0)) // "m_sleepList.size ()== 0" for non-ap stations
               // no sleep 
                 {
@@ -1175,6 +1177,8 @@ EdcaTxopN::AccessAllowedIfRaw (bool allowed)
 void
 EdcaTxopN::RestartAccessIfNeeded (void)
 {
+NS_LOG_DEBUG ("++++ EdcaTxopN::RestartAccessIfNeeded,m_currentPacket != 0=" << (m_currentPacket != 0) << ",!m_queue->IsEmpty ()=" << !m_queue->IsEmpty () << ",m_baManager->HasPackets ()=" << m_baManager->HasPackets () << ",!m_dcf->IsAccessRequested ()=" << !m_dcf->IsAccessRequested () << ",AccessIfRaw=" << AccessIfRaw );
+//NS_LOG_UNCOND (this << "retry=" << (int)m_currentHdr.m_ctrlRetry);
   NS_LOG_FUNCTION (this);
   if ((m_currentPacket != 0
        || !m_queue->IsEmpty () || m_baManager->HasPackets ())
@@ -1191,7 +1195,8 @@ void
 EdcaTxopN::StartAccessIfNeeded (void)
 {
   NS_LOG_FUNCTION (this);
-  //std::cout << "++++ EdcaTxopN::StartAccessIfNeeded,m_currentPacket == 0=" << (m_currentPacket == 0) << ",!m_queue->IsEmpty ()=" << !m_queue->IsEmpty () << ",m_baManager->HasPackets ()=" << m_baManager->HasPackets () << ",!m_dcf->IsAccessRequested ()=" << !m_dcf->IsAccessRequested () << ",AccessIfRaw=" << AccessIfRaw << std::endl;
+  NS_LOG_DEBUG("++++ EdcaTxopN::StartAccessIfNeeded,m_currentPacket == 0=" << (m_currentPacket == 0) << ",!m_queue->IsEmpty ()=" << !m_queue->IsEmpty () << ",m_baManager->HasPackets ()=" << m_baManager->HasPackets () << ",!m_dcf->IsAccessRequested ()=" << !m_dcf->IsAccessRequested () << ",AccessIfRaw=" << AccessIfRaw );
+  NS_LOG_UNCOND ("retry=" << (int)m_currentHdr.m_ctrlRetry);
   if (m_currentPacket == 0
       && (!m_queue->IsEmpty () || m_baManager->HasPackets ())
       && !m_dcf->IsAccessRequested ()

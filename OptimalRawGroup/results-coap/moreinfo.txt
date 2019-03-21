@@ -1,0 +1,3 @@
+Sta node#      distance        timerx      timeidle        timetx      timesleep      totenergy
+0         46.1979         0.01272         0.491837         0         0         +2.22004956800000030626
+1         84.8531         0.01236         0.491837         0.00036         0         +2.22105813560000031614
