@@ -509,8 +509,14 @@ public:
   static const Time& GetRawStartTime (void);
   static const Time& GetRawSlotDuration (void);
   static const bool& GetCrossSlotBoundary (void);
+
   Ptr<const Packet> GetCurrentPacket (void) const;
+  void SetCurrentPacket (Ptr<const Packet> pkt);
   void ResetCurrentPacket (void);
+  WifiMacHeader GetCurrentHdr (void) const;
+  void SetCurrentHdr (WifiMacHeader hdr);
+  Time GetCurrentPktTimestamp (void) const;
+  void SetCurrentPktTimestamp (Time t);
 private:
     TracedCallback<double, double > m_AccessQuest_record;
 

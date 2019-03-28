@@ -557,9 +557,39 @@ EdcaTxopN::GetCurrentPacket (void) const
 }
 
 void
+EdcaTxopN::SetCurrentPacket (Ptr<const Packet> pkt)
+{
+	m_currentPacket = pkt;
+}
+
+void
 EdcaTxopN::ResetCurrentPacket (void)
 {
 	m_currentPacket = 0;
+}
+
+WifiMacHeader
+EdcaTxopN::GetCurrentHdr (void) const
+{
+	return m_currentHdr;
+}
+
+void
+EdcaTxopN::SetCurrentHdr (WifiMacHeader hdr)
+{
+	m_currentHdr=hdr;
+}
+
+Time
+EdcaTxopN::GetCurrentPktTimestamp (void) const
+{
+	return m_currentPacketTimestamp;
+}
+
+void
+EdcaTxopN::SetCurrentPktTimestamp (Time t)
+{
+	m_currentPacketTimestamp = t;
 }
 
 void

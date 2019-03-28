@@ -178,7 +178,10 @@ public:
    */
   bool NeedsAccess (void) const;
   Ptr<const Packet> GetCurrentPacket (void) const;
+  void SetCurrentPacket (Ptr<const Packet> pkt);
   void ResetCurrentPacket (void);
+  WifiMacHeader GetCurrentHdr (void) const;
+  void SetCurrentHdr (WifiMacHeader hdr);
 private:
   class TransmissionListener;
   class NavListener;

@@ -1,4 +1,0 @@
-Number of RAW groups = 1
-
-RAW no.             |  RawControl          SlotCrossBoundary   SlotFormat          SlotDurationCount   SlotNum             PageIndex           AidStart            AidEnd              
-0                   |  88                  1                   0                   20                  1                   0                   2                   2                   

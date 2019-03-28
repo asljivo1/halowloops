@@ -211,64 +211,6 @@ void ApWifiMac::DoDispose() {
 	RegularWifiMac::DoDispose();
 }
 
-ApWifiMac::CurrentPacket::CurrentPacket () : m_currentPacket (0)
-{}
-
-ApWifiMac::CurrentPacket::~CurrentPacket ()
-{}
-
-void
-ApWifiMac::CurrentPacket::GetFromEdca (EdcaQueues edca, AcIndex type)
-{
-	m_currentPacket = edca.find(type)->second->GetCurrentPacket();
-	m_currentHdr = edca.find(type)->second->GetCurrentHdr();
-	m_currentPktTimestamp = edca.find(type)->second->GetCurrentPktTimestamp();
-}
-
-void
-ApWifiMac::CurrentPacket::SetToEdca (CurrentPacket pkt, EdcaQueues edca, AcIndex type)
-{
-	edca.find(type)->second->SetCurrentPacket(pkt.m_currentPacket);
-	edca.find(type)->second->SetCurrentHdr(pkt.m_currentHdr);
-	edca.find(type)->second->SetCurrentPktTimestamp(pkt.m_currentPktTimestamp);
-}
-
-void
-ApWifiMac::CurrentPacket::ResetEdca (EdcaQueues edca, AcIndex type)
-{
-	edca.find(type)->second->ResetCurrentPacket();
-	edca.find(type)->second->SetCurrentHdr(WifiMacHeader ());
-	edca.find(type)->second->SetCurrentPktTimestamp(Time ());
-	m_currentPacket = 0;
-	m_currentHdr = WifiMacHeader ();
-	m_currentPktTimestamp = Time ();
-}
-
-void
-ApWifiMac::CurrentPacket::GetFromDca (Ptr<DcaTxop> dca)
-{
-	m_currentPacket = dca->GetCurrentPacket();
-	m_currentHdr = dca->GetCurrentHdr();
-	m_currentPktTimestamp = Time ();
-}
-
-void
-ApWifiMac::CurrentPacket::SetToDca (CurrentPacket pkt, Ptr<DcaTxop> dca)
-{
-	dca->SetCurrentPacket(pkt.m_currentPacket);
-	dca->SetCurrentHdr(pkt.m_currentHdr);
-}
-
-void
-ApWifiMac::CurrentPacket::ResetDca (Ptr<DcaTxop> dca)
-{
-	dca->ResetCurrentPacket();
-	dca->SetCurrentHdr(WifiMacHeader ());
-	m_currentPacket = 0;
-	m_currentHdr = WifiMacHeader ();
-	m_currentPktTimestamp = Time ();
-}
-
 void ApWifiMac::SetAddress(Mac48Address address) {
 	NS_LOG_FUNCTION(this << address);
 	//As an AP, our MAC address is also the BSSID. Hence we are
@@ -1267,6 +1209,7 @@ uint8_t ApWifiMac::HasPacketsToBlock(uint16_t blockInd, uint16_t PageInd) {
 						m_PageSliceNum = 31;
 					break;
 				}
+<<<<<<< HEAD
 				else if (std::find(m_aidsForcePage.begin(), m_aidsForcePage.end(), sta_aid) != m_aidsForcePage.end())
 				{
 					//force paging
@@ -1275,6 +1218,8 @@ uint8_t ApWifiMac::HasPacketsToBlock(uint16_t blockInd, uint16_t PageInd) {
 					staIsActiveDuringCurrentCycle[sta_aid - 1] = true;
 					break;
 				}
+=======
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 				else
 				{
 					staIsActiveDuringCurrentCycle[sta_aid - 1] = false;
@@ -1444,7 +1389,10 @@ void ApWifiMac::SendOneBeacon(void) {
 		{
 			std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (*it);
 			auto dest = this->m_AidToMacAddr.find(*it)->second;
-
+<<<<<<< HEAD
+=======
+			bool stillEnqueued = false;
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 			int qlen = 0;
 			for (auto targetSlot : allTargetSlots)
 			{
@@ -1456,6 +1404,7 @@ void ApWifiMac::SendOneBeacon(void) {
 							WifiMacHeader::ADDR1, dest));
 					qsize--;
 				}
+<<<<<<< HEAD
 				Ptr<const Packet> currentPkt = m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetCurrentPacket();
 				if (currentPkt != 0)
 				{
@@ -1463,6 +1412,8 @@ void ApWifiMac::SendOneBeacon(void) {
 					//m_rawSlotsEdca[targetSlot].find(AC_VO)->second->ResetCurrentPacket();
 				}
 
+=======
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 				qsize =  m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->GetSize();
 				std::vector<Ptr<const Packet> > peekedPackets_VI;
 				while (qsize > 0)
@@ -1471,6 +1422,7 @@ void ApWifiMac::SendOneBeacon(void) {
 							WifiMacHeader::ADDR1, dest));
 					qsize--;
 				}
+<<<<<<< HEAD
 				currentPkt = m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetCurrentPacket();
 				if (currentPkt != 0)
 				{
@@ -1478,6 +1430,8 @@ void ApWifiMac::SendOneBeacon(void) {
 					//m_rawSlotsEdca[targetSlot].find(AC_VI)->second->ResetCurrentPacket();
 				}
 
+=======
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 				qsize =  m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->GetSize();
 				std::vector<Ptr<const Packet> > peekedPackets_BE;
 				while (qsize > 0)
@@ -1486,6 +1440,7 @@ void ApWifiMac::SendOneBeacon(void) {
 							WifiMacHeader::ADDR1, dest));
 					qsize--;
 				}
+<<<<<<< HEAD
 				currentPkt = m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetCurrentPacket();
 				if (currentPkt != 0)
 				{
@@ -1493,6 +1448,8 @@ void ApWifiMac::SendOneBeacon(void) {
 					//m_rawSlotsEdca[targetSlot].find(AC_BE)->second->ResetCurrentPacket();
 				}
 
+=======
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 				qsize =  m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->GetSize();
 				std::vector<Ptr<const Packet> > peekedPackets_BK;
 				while (qsize > 0)
@@ -1501,6 +1458,7 @@ void ApWifiMac::SendOneBeacon(void) {
 							WifiMacHeader::ADDR1, dest));
 					qsize--;
 				}
+<<<<<<< HEAD
 				currentPkt = m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetCurrentPacket();
 				if (currentPkt != 0)
 				{
@@ -1535,6 +1493,38 @@ void ApWifiMac::SendOneBeacon(void) {
 
 			it++;
 		}
+
+=======
+
+				if (peekedPackets_VO.size() != 0 || peekedPackets_VI.size() != 0 || peekedPackets_BE.size() != 0 || peekedPackets_BK.size() != 0)
+				{
+					qlen += peekedPackets_VO.size() + peekedPackets_VI.size() + peekedPackets_BE.size() + peekedPackets_BK.size();
+					NS_LOG_UNCOND ("Slot " << targetSlot << " has qlen=" << qlen << " packets enqueued for aid=" << (int)(*it));
+
+				}
+			}
+			for (int k = 0; k < qlen; k++)
+			{
+				m_enqueuedToAids.push_back(*it);
+			}
+			/*int count = std::count(m_enqueuedToAids.begin(), m_enqueuedToAids.end(), *it);
+			int numdelivered = count - qlen;
+			if (numdelivered > 0)
+			{
+				NS_LOG_UNCOND ("***for aid" << (int)(*it) <<" numpackets=" << qlen << " still enqueued, but also numdelivered=" << numdelivered);
+				while (numdelivered > 0)
+				{
+					auto delIt = std::find(m_enqueuedToAids.begin(), m_enqueuedToAids.end(), *it);
+					m_enqueuedToAids.erase(delIt);
+					//m_sentToAids.push_back(*it);
+					numdelivered--;
+				}
+			}*/
+
+			it++;
+		}
+
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 
 		//////////////////////////
 		/*it=this->m_enqueuedToAids.begin();
@@ -1592,7 +1582,11 @@ void ApWifiMac::SendOneBeacon(void) {
 		{
 			RPS rps;
 			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
+<<<<<<< HEAD
 			m_aidsForcePage = m_S1gRawCtr.GetAidsToForcePage();
+=======
+
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 			UpdateQueues(rps);
 			int i = 0;
 			int oldNumRaws = m_rpsset.rpsset.at(0)->GetNumberOfRawGroups();
@@ -2462,14 +2456,15 @@ ApWifiMac::UpdateQueues (RPS newRps)
 	unique_it = std::unique(pagedCpy.begin(), pagedCpy.end());
 	pagedCpy.resize(std::distance(pagedCpy.begin(), unique_it) );
 
+	typedef std::vector<Ptr<const Packet> > PtrsToPackets;
+	typedef std::vector<AcIndex> AcIndices;
 	std::map<uint16_t, PtrsToPackets> tempStoragePackets;
 	std::map<uint16_t, AcIndices> tempStorageAcIndices;
-	std::map<uint16_t, CurrentPackets> tempCurrentPackets;
 	for (auto aid : pagedCpy)
 	{
 		tempStoragePackets.insert(std::pair<uint16_t, PtrsToPackets>(aid, PtrsToPackets() ) );
 		tempStorageAcIndices.insert(std::pair<uint16_t, AcIndices>(aid, AcIndices() ) );
-		tempCurrentPackets.insert (std::pair<uint16_t, CurrentPackets>(aid, CurrentPackets() ));
+
 	}
 	std::vector<uint16_t>::iterator it = pagedCpy.begin();
 	std::cout << "PAGED STATIONS: ";
@@ -2493,13 +2488,15 @@ ApWifiMac::UpdateQueues (RPS newRps)
 				PtrsToPackets::iterator ppi = peekedPackets_VO.end();
 				--ppi;
 				m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetEdcaQueue()->Remove(*ppi);
+<<<<<<< HEAD
 			}
-			CurrentPacket currentPkt;
-			currentPkt.GetFromEdca(m_rawSlotsEdca[targetSlot], AC_VO);
-			if (currentPkt.m_currentPacket != 0 && tempCurrentPackets.find(*it)->second.size() == 0)
+			Ptr<const Packet> currentPkt_V0 = m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetCurrentPacket();
+			if (currentPkt_V0 != 0)
 			{
-				tempCurrentPackets.find(*it)->second.push_back(currentPkt);
-				currentPkt.ResetEdca(m_rawSlotsEdca[targetSlot], AC_VO);
+				peekedPackets_VO.insert(peekedPackets_VO.begin(), currentPkt_V0);
+				m_rawSlotsEdca[targetSlot].find(AC_VO)->second->ResetCurrentPacket();
+=======
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 			}
 
 			PtrsToPackets peekedPackets_VI;
@@ -2509,28 +2506,38 @@ ApWifiMac::UpdateQueues (RPS newRps)
 				PtrsToPackets::iterator ppi = peekedPackets_VI.end();
 				--ppi;
 				m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->Remove(*ppi);
+<<<<<<< HEAD
 			}
-			currentPkt.GetFromEdca(m_rawSlotsEdca[targetSlot], AC_VI);
-			if (currentPkt.m_currentPacket != 0 && tempCurrentPackets.find(*it)->second.size() == 0)
+			Ptr<const Packet> currentPkt_VI = m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetCurrentPacket();
+			if (currentPkt_VI != 0)
 			{
-				tempCurrentPackets.find(*it)->second.push_back(currentPkt);
-				currentPkt.ResetEdca(m_rawSlotsEdca[targetSlot], AC_VI);
+				peekedPackets_VI.insert(peekedPackets_VI.begin(), currentPkt_VI);
+				m_rawSlotsEdca[targetSlot].find(AC_VI)->second->ResetCurrentPacket();
+=======
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 			}
 
 			PtrsToPackets peekedPackets_BE;
+<<<<<<< HEAD
 			//NS_LOG_UNCOND ("Num packets enqueued BE = " << m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->GetSize());
+=======
+			NS_LOG_UNCOND ("Num packets enqueued BE = " << m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->GetSize());
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 			while (m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->GetSize() > 0 && tempStoragePackets.find(*it)->second.size() == 0)
 			{
 				peekedPackets_BE.push_back(m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest));
 				PtrsToPackets::iterator ppi = peekedPackets_BE.end();
 				--ppi;
 				m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->Remove(*ppi);
+<<<<<<< HEAD
 			}
-			currentPkt.GetFromEdca(m_rawSlotsEdca[targetSlot], AC_BE);
-			if (currentPkt.m_currentPacket != 0 && tempCurrentPackets.find(*it)->second.size() == 0)
+			Ptr<const Packet> currentPkt_BE = m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetCurrentPacket();
+			if (currentPkt_BE != 0)
 			{
-				tempCurrentPackets.find(*it)->second.push_back(currentPkt);
-				currentPkt.ResetEdca(m_rawSlotsEdca[targetSlot], AC_BE);
+				peekedPackets_BE.insert(peekedPackets_BE.begin(), currentPkt_BE);
+				m_rawSlotsEdca[targetSlot].find(AC_BE)->second->ResetCurrentPacket();
+=======
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 			}
 
 			PtrsToPackets peekedPackets_BK;
@@ -2540,12 +2547,15 @@ ApWifiMac::UpdateQueues (RPS newRps)
 				PtrsToPackets::iterator ppi = peekedPackets_BK.end();
 				--ppi;
 				m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->Remove(*ppi);
+<<<<<<< HEAD
 			}
-			currentPkt.GetFromEdca(m_rawSlotsEdca[targetSlot], AC_BK);
-			if (currentPkt.m_currentPacket != 0 && tempCurrentPackets.find(*it)->second.size() == 0)
+			Ptr<const Packet> currentPkt_BK = m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetCurrentPacket();
+			if (currentPkt_BK != 0)
 			{
-				tempCurrentPackets.find(*it)->second.push_back(currentPkt);
-				currentPkt.ResetEdca(m_rawSlotsEdca[targetSlot], AC_BK);
+				peekedPackets_BK.insert(peekedPackets_BK.begin(), currentPkt_BK);
+				m_rawSlotsEdca[targetSlot].find(AC_BK)->second->ResetCurrentPacket();
+=======
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 			}
 
 			PtrsToPackets peekedPackets;
@@ -2556,19 +2566,21 @@ ApWifiMac::UpdateQueues (RPS newRps)
 				--ppi;
 				m_rawSlotsDca[targetSlot]->GetQueue()->Remove(*ppi);
 			}
-
-			currentPkt.GetFromDca(m_rawSlotsDca[targetSlot]);
-			if (currentPkt.m_currentPacket != 0 && tempCurrentPackets.find(*it)->second.size() == 0)
+			Ptr<const Packet> currentPkt = m_rawSlotsDca[targetSlot]->GetCurrentPacket();
+			if (currentPkt != 0)
 			{
-				tempCurrentPackets.find(*it)->second.push_back(currentPkt);
-				currentPkt.ResetDca(m_rawSlotsDca[targetSlot]);
+<<<<<<< HEAD
+				peekedPackets.insert(peekedPackets.begin(), currentPkt);
+				m_rawSlotsDca[targetSlot]->ResetCurrentPacket();
 			}
 			int sum = peekedPackets_VO.size() + peekedPackets_VI.size() + peekedPackets_BE.size() + peekedPackets_BK.size();
-			//sum += (int)(currentPkt_VO != 0) + (int)(currentPkt_VI != 0) + (int)(currentPkt_BE != 0) + (int)(currentPkt_BK != 0) + (int)(currentPkt != 0);
 			if (sum != 0)
 			{
 
 				NS_LOG_UNCOND ("+++QUEUES+ AID=" << *it << " has " << sum << " packets enqueued in slot " << targetSlot);
+=======
+				NS_LOG_UNCOND ("+++QUEUES+ AID=" << *it << " has " << m_rawSlotsEdca[targetSlot].size() / 4 << " packets enqueued in slot " << targetSlot);
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 				uint16_t aid_oldSlot = this->GetCritAidFromSlotNum (new_allTargetSlots[0], *m_rpsset.rpsset.at(0));
 				NS_LOG_UNCOND ("+++QUEUES+ PACKETS MUST BE ENQUEUED TO NEW SLOT " << new_allTargetSlots[0]);
 
@@ -2619,7 +2631,6 @@ ApWifiMac::UpdateQueues (RPS newRps)
 							m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VO)->second->QueueNoAccess(ptrPkt, hdr);
 						}
 					}
-
 					if (peekedPackets_VI.size() != 0)
 					{
 						if (m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VI)->second->GetEdcaQueue()->GetSize() > 0 && tempStoragePackets.find(aid_oldSlot)->second.size() == 0)
@@ -2654,7 +2665,6 @@ ApWifiMac::UpdateQueues (RPS newRps)
 							m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_VI)->second->QueueNoAccess(ptrPkt, hdr);
 						}
 					}
-
 					if (peekedPackets_BE.size() != 0)
 					{
 						if ((m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->GetSize() > 0 || m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetCurrentPacket() != 0) && tempStoragePackets.find(aid_oldSlot)->second.size() == 0)
@@ -2665,6 +2675,11 @@ ApWifiMac::UpdateQueues (RPS newRps)
 							Mac48Address otherdest = this->m_AidToMacAddr.find(otheraid)->second;
 							while (m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->GetSize() > 0)
 							{
+<<<<<<< HEAD
+=======
+								int otheraid = this->GetCritAidFromSlotNum(new_allTargetSlots[0], *m_rpsset.rpsset.at(0));
+								Mac48Address otherdest = this->m_AidToMacAddr.find(otheraid)->second;
+>>>>>>> f9653bbe81d5fccfbdd677b8eabaf7f6f22836e3
 								auto newPkt = m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, otherdest);
 								//NS_ASSERT (tid == QosUtilsGetTidForPacket(newPkt));
 								tempStoragePackets[aid_oldSlot].push_back(newPkt);
@@ -2695,7 +2710,6 @@ ApWifiMac::UpdateQueues (RPS newRps)
 							m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->QueueNoAccess(ptrPkt, hdr);
 						}
 					}
-
 					if (peekedPackets_BK.size() != 0)
 					{
 						if (m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BK)->second->GetEdcaQueue()->GetSize() > 0 && tempStoragePackets.find(aid_oldSlot)->second.size() == 0)
@@ -2848,7 +2862,6 @@ ApWifiMac::UpdateQueues (RPS newRps)
 		}
 	}
 
-
 	//I have rearranged the queues, now I can delete the ones too many
 	for (uint32_t i = newTotalNumSlots; i < this->m_rpsset.rpsset.at(0)->GetTotalNumSlots(); i++)
 	{
@@ -2869,31 +2882,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 		for (EdcaQueues::iterator it = new_rawSlotsEdca[i].begin(); it != new_rawSlotsEdca[i].end(); ++it)
 			it->second->Dispose();
 	}
-
-	//assign current packets from tempCurrentPackets
-	AssignCurrentPacketsToQueues (tempCurrentPackets, newRps);
 }
-
-void
-ApWifiMac::AssignCurrentPacketsToQueues (std::map<uint16_t, CurrentPackets> tempCurrentPackets, RPS rps)
-{
-	std::map<uint16_t, CurrentPackets>::iterator it;
-	for (it = tempCurrentPackets.begin(); it != tempCurrentPackets.end(); it++)
-	{
-		auto aid = it->first;
-		std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (aid, rps);
-		if (it->second.size() > allTargetSlots.size())
-		{
-			//Problem, we have more current packets than slots to assign them to. There was more slots in the previous rps
-		}
-		else
-		{
-			//find seq of the current packets and assign them to ascending slots
-
-		}
-	}
-}
-
 void
 ApWifiMac::InitializeQueues (uint32_t num)
 {

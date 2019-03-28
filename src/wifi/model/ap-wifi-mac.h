@@ -53,6 +53,7 @@ namespace ns3 {
 class ApWifiMac : public RegularWifiMac
 {
 public:
+
   static TypeId GetTypeId (void);
 
   typedef void (* PacketToTransmitReceivedFromUpperLayerCallback)
@@ -149,6 +150,25 @@ public:
 
 
 private:
+  class CurrentPacket
+  	{
+  	public:
+  		CurrentPacket ();
+  		~CurrentPacket ();
+  		void GetFromEdca (EdcaQueues edca, AcIndex type);
+  		void SetToEdca (CurrentPacket pkt, EdcaQueues edca, AcIndex type);
+  		void ResetEdca (EdcaQueues edca, AcIndex type);
+
+  		void GetFromDca (Ptr<DcaTxop> dca);
+  		void SetToDca (CurrentPacket pkt, Ptr<DcaTxop> dca);
+  		void ResetDca (Ptr<DcaTxop> dca);
+
+  		Ptr<const Packet> m_currentPacket;
+  		WifiMacHeader m_currentHdr;
+  		Time m_currentPktTimestamp;
+  	private:
+
+  	};
   virtual void Receive (Ptr<Packet> packet, const WifiMacHeader *hdr);
 
   void NotifyEdcaOfCsb (Time rawSlotStart, Time slotDuration, bool csb);
@@ -278,12 +298,15 @@ private:
   uint32_t GetTotalStaNum (void) const;
   void SetupEdcaQueue (enum AcIndex ac, EdcaQueues& edcaqueues);
   typedef std::vector<ns3::RPS *>::iterator RPSlistCI;
-    
+  typedef std::vector<Ptr<const Packet> > PtrsToPackets;
+  typedef std::vector<AcIndex> AcIndices;
+  typedef std::vector <CurrentPacket> CurrentPackets;
+
   virtual void DoDispose (void);
   virtual void DoInitialize (void);
   void UpdateQueues (RPS newRps);
   void InitializeQueues (uint32_t num);
-  
+  void AssignCurrentPacketsToQueues (std::map<uint16_t, CurrentPackets> tempCurrentPackets, RPS rps);
   TracedCallback<Ptr<const Packet>, Mac48Address, bool, bool, Time> m_packetToTransmitReceivedFromUpperLayer;
   TracedCallback<uint16_t,uint16_t> m_rawSlotStarted;
   TracedValue<uint16_t> m_rpsIndexTrace;

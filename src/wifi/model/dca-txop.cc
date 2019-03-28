@@ -299,9 +299,28 @@ DcaTxop::GetCurrentPacket (void) const
 }
 
 void
+DcaTxop::SetCurrentPacket (Ptr<const Packet> pkt)
+{
+	m_currentPacket = pkt;
+}
+
+void
 DcaTxop::ResetCurrentPacket (void)
 {
 	m_currentPacket = 0;
+}
+
+
+WifiMacHeader
+DcaTxop::GetCurrentHdr (void) const
+{
+	return m_currentHdr;
+}
+
+void
+DcaTxop::SetCurrentHdr (WifiMacHeader hdr)
+{
+	m_currentHdr=hdr;
 }
 
 void
