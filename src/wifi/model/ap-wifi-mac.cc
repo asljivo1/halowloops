@@ -1386,6 +1386,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		{
 			std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (*it);
 			auto dest = this->m_AidToMacAddr.find(*it)->second;
+
 			int qlen = 0;
 			for (auto targetSlot : allTargetSlots)
 			{
@@ -1476,7 +1477,6 @@ void ApWifiMac::SendOneBeacon(void) {
 
 			it++;
 		}
-
 
 		//////////////////////////
 		/*it=this->m_enqueuedToAids.begin();
