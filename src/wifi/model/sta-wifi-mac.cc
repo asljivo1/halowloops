@@ -729,7 +729,7 @@ void StaWifiMac::GoToSleep (Time sleeptime)
 		}
 		sleeptime -= GetEarlyWakeTime();
 		if (!m_low->GetPhy()->IsStateSleep()
-				&& (sleeptime.GetMicroSeconds() > 0))
+				&& (sleeptime.GetMicroSeconds() >= 0))
 		{
 			if (testtrackit)
 				NS_LOG_DEBUG(
@@ -737,6 +737,14 @@ void StaWifiMac::GoToSleep (Time sleeptime)
 			m_low->GetPhy()->SetSleepMode();
 			Simulator::Schedule(sleeptime, &StaWifiMac::WakeUp, this);
 			//std::cout << "+++At " << Simulator::Now().GetMicroSeconds() << "us: GoToSleep:" << sleeptime.GetMicroSeconds() << " FULL" << std::endl;
+
+		}
+		else if (m_low->GetPhy()->IsStateSleep() && sleeptime.GetMicroSeconds() >= 0 )
+		{
+			if (testtrackit)
+				NS_LOG_DEBUG(
+						"At " << Simulator::Now().GetSeconds() << " s AID " << this->GetAID(0) << " already SLEEPs. Schedule wake-up after " << sleeptime.GetSeconds() << " s.");
+			Simulator::Schedule(sleeptime, &StaWifiMac::WakeUp, this);
 
 		}
 	}
@@ -761,7 +769,7 @@ StaWifiMac::GoToSleepBinary (int value)
         {
             //called finish raw slot, after receiving beacon also if it's not my slot
             //if(!outsideraw && !stationrawslot && !waitingack)
-            if(!waitingack && !m_low->GetPhy()->IsStateSleep())
+            if(!waitingack && !m_low->GetPhy()->IsStateSleep() )
             {
                 m_low->GetPhy()->SetSleepMode();
                 if (testtrackit)
@@ -1750,7 +1758,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
     		{
     			sleept = m_statSlotStart[i] - MicroSeconds (1);
     			GoToSleep (sleept);
-        		NS_LOG_UNCOND ("aid=" << m_aids[0] << ": Sleep now. After " <<  sleept << " sheduled wakeup.");
+        		//NS_LOG_UNCOND ("aid=" << m_aids[0] << ": Sleep now. After " <<  sleept << " sheduled wakeup.");
 
     		}
     		else

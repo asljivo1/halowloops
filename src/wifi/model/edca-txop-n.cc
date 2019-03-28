@@ -550,6 +550,18 @@ EdcaTxopN::SetsleepList (std::map<Mac48Address, bool> list)
     m_sleepList = list;
 }
 
+Ptr<const Packet>
+EdcaTxopN::GetCurrentPacket (void) const
+{
+	return m_currentPacket;
+}
+
+void
+EdcaTxopN::ResetCurrentPacket (void)
+{
+	m_currentPacket = 0;
+}
+
 void
 EdcaTxopN::NotifyAccessGranted (void)
 {
@@ -591,10 +603,10 @@ EdcaTxopN::NotifyAccessGranted (void)
               && !m_baManager->ExistsAgreement (m_currentHdr.GetAddr1 (), m_currentHdr.GetQosTid ())
               && SetupBlockAckIfNeeded ())
             {
-        	  NS_LOG_DEBUG (" HEREE");
+        	  //NS_LOG_DEBUG (" HEREE");
               return;
             }
-          NS_LOG_DEBUG (" HEREE++");
+
           //temporary, should be removed when ps-poll is suported
           //Ptr<const Packet> PacketTest = m_queue->PeekFirstAvailable (&m_currentHdr, m_currentPacketTimestamp, m_qosBlockedDestinations);
           
@@ -610,7 +622,6 @@ EdcaTxopN::NotifyAccessGranted (void)
         	  //std::cout << "+++NOT CORRECT SLOT" << std::endl;
         	  return;
           }
-          NS_LOG_UNCOND (this << " HEREE++++++++++++++");
           /*    if (!(!m_sleepList.find(m_currentHdr.GetAddr1())->second || m_sleepList.size ()== 0)) // "m_sleepList.size ()== 0" for non-ap stations
               // no sleep 
                 {

@@ -292,6 +292,18 @@ DcaTxop::GetAifsn (void) const
   return m_dcf->GetAifsn ();
 }
 
+Ptr<const Packet>
+DcaTxop::GetCurrentPacket (void) const
+{
+	return m_currentPacket;
+}
+
+void
+DcaTxop::ResetCurrentPacket (void)
+{
+	m_currentPacket = 0;
+}
+
 void
 DcaTxop::Queue (Ptr<const Packet> packet, const WifiMacHeader &hdr)
 {

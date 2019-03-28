@@ -509,6 +509,8 @@ public:
   static const Time& GetRawStartTime (void);
   static const Time& GetRawSlotDuration (void);
   static const bool& GetCrossSlotBoundary (void);
+  Ptr<const Packet> GetCurrentPacket (void) const;
+  void ResetCurrentPacket (void);
 private:
     TracedCallback<double, double > m_AccessQuest_record;
 

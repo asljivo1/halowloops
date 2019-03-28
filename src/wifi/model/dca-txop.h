@@ -177,7 +177,8 @@ public:
    *         false otherwise
    */
   bool NeedsAccess (void) const;
-
+  Ptr<const Packet> GetCurrentPacket (void) const;
+  void ResetCurrentPacket (void);
 private:
   class TransmissionListener;
   class NavListener;

@@ -1699,13 +1699,33 @@ S1gRawCtr::DistributeStationsToRaws ()
 	{
 		SensorActuator * sta = LookupCriticalSta ((*ci)->GetAid());
 		//AASIGN ASAP RAW IS PAGED OR EXTEND EXISTING ONE TAKE INTO ACCOUTN PENDING DLPACKETS
+
 		auto aid = (*ci)->GetAid();
+		NS_LOG_UNCOND ("AID=" << aid << " is critical and has interval=" << sta->m_tInterval << ", m_tSent=" << sta->m_tSent << ", m_tSentPrev=" << sta->m_tSentPrev);
 		if (sta->m_tInterval != Time ())
 		{
-			if (sta->m_tSent + sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval) && std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
+			Time reserve = sta->m_tInterval > MicroSeconds (m_beaconInterval) ? Simulator::Now() - 5 * sta->m_tInterval - MilliSeconds (10) : Simulator::Now() - 5 * MicroSeconds (m_beaconInterval);
+			if (sta->m_tSent + sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval) && sta->m_tSent > reserve && std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
 			{
 				//I expect there will be at least 1 TX by sta in the next beacon
 				m_aidForcePage.push_back(sta->GetAid());
+			}
+			else
+			{
+				//the last sta->m_tSent is too old, assign generic RAWs
+				NS_LOG_UNCOND ("The last m_tSent time IS TOO OLD, ASSIGN GENERIC RAWs");
+				Slot s;
+				s.SetAid(aid);
+				Time sst = GetSoonestSlotStartTime (criticalSlots, GetUlSlotCount() + 10, aid);
+				s.SetSlotStartTime(sst);
+				auto count = GetUlSlotCount() + 10;
+				if (count < 256)
+					s.SetSlotFormat(0);
+				else if (count < 2048)
+					s.SetSlotFormat(1);
+				s.SetSlotCount(count);
+				criticalSlots.push_back(s);
+				continue;
 			}
 			uint16_t n (1);
 			while (sta->m_tSent + n * sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval))
