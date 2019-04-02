@@ -904,7 +904,7 @@ StaWifiMac::OnDeassociated() {
 
 void
 StaWifiMac::RawSlotStartBackoff (void)
-{    
+{    //NS_LOG_DEBUG ("aid=" << this->GetAID(0) << "StaWifiMac::RawSlotStartBackoff");
 	m_slotCounter++;
     if (m_insideBackoffEvent.IsRunning ())
      {
@@ -973,6 +973,8 @@ void
 StaWifiMac::StartRawbackoff (void)
 {
 	//NS_LOG_UNCOND ("Sta aid=" << this->GetAID() << " StaWifiMac::StartRawbackoff AT " << Simulator::Now() << ", currentslotDuration=" << m_currentslotDuration[m_slotCounter] << ", currentSlotCounter=" << m_slotCounter);
+  if (m_slotCounter == -1 && m_currentslotDuration.size() == 1)
+	  m_slotCounter++;
   m_pspollDca->RawStart (m_currentslotDuration[m_slotCounter], m_crossSlotBoundaryAllowed); //not really start raw useless allowedAccessRaw is true;
   m_dca->RawStart (m_currentslotDuration[m_slotCounter], m_crossSlotBoundaryAllowed);
   m_edca.find (AC_VO)->second->RawStart ();
@@ -985,7 +987,7 @@ StaWifiMac::StartRawbackoff (void)
 void
 StaWifiMac::OutsideRawStartBackoff (void)
 {
-	//NS_LOG_UNCOND ("aid=" << this->GetAID(0) << ", StaWifiMac::OutsideRawStartBackoff");
+	//NS_LOG_DEBUG ("aid=" << this->GetAID(0) << "StaWifiMac::OutsideRawStartBackoff");
 	if (this->GetAidRequest().GetServiceCharacteristic() == AidRequest::CRITICAL_SERVICE)
 		return;
    if (m_insideBackoffEvent.IsRunning ())
@@ -1723,6 +1725,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         	}
         	m_sharedSlotDuration = MicroSeconds (beacon.GetBeaconCompatibility().GetBeaconInterval ()) - m_lastRawDurationus;
         	//NS_LOG_UNCOND ("STA m_sharedSlotDuration us=" << m_sharedSlotDuration.GetMicroSeconds() << ", m_lastRawDurationus=" << m_lastRawDurationus.GetMicroSeconds() << ", beaconInterval=" << beacon.GetBeaconCompatibility().GetBeaconInterval ());
+        	m_currentslotDuration.push_back(m_sharedSlotDuration);
         	m_rawStart = true;
         	S1gTIMReceived(beacon);
         }
