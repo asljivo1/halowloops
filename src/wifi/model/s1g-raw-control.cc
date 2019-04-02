@@ -71,7 +71,7 @@ Slot::~Slot ()
 uint16_t
 Slot::GetAid (void) const
 {
-	NS_ASSERT (m_startAid == m_endAid);
+	//NS_ASSERT (m_startAid == m_endAid);
 	return m_assignedAid;
 }
 
@@ -498,8 +498,8 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 					{
 						if (stationTransmit->m_tInterval == Time ())
 							stationTransmit->m_tInterval = stationTransmit->m_tSent - stationTransmit->m_tSentPrev;
-						else
-							NS_ASSERT (stationTransmit->m_tInterval == stationTransmit->m_tSent - stationTransmit->m_tSentPrev);
+						//else
+							//NS_ASSERT (stationTransmit->m_tInterval == stationTransmit->m_tSent - stationTransmit->m_tSentPrev);
 					}
 					//NS_LOG_UNCOND ("*****aid=" << *ci << ", m_tInterval=" << stationTransmit->m_tInterval << ", m_tSent=" << stationTransmit->m_tSent << ", m_tSentPrev=" << stationTransmit->m_tSentPrev);
 					//NS_LOG_UNCOND ("m_tSuccessLast=" << stationTransmit->m_tSuccessLast << ", m_tSuccessPreLast=" << stationTransmit->m_tSuccessPreLast << ", m_nTx=" << stationTransmit->m_nTx);
@@ -1481,8 +1481,6 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
 
     	 delete m_rps;
     	 m_rps = new RPS;
-
-
     	 DistributeStationsToRaws ();
 
     	 // I've populated m_criticalStations, m_aidListPaged, m_aidList;
@@ -1559,7 +1557,35 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 	if (this->m_beaconInterval - beaconTxDuration.GetMicroSeconds() < (rawlenCritical + rawlenSensors).GetMicroSeconds())
 	{
 		//raw too large
-		if (rawlenSensors > Time() && this->m_sensorStations.size() > 0)
+		if (rawlenCritical.GetMicroSeconds() > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
+		{
+			NS_LOG_UNCOND ("Critical RAWs take more channel time than available. Delete the last most freq. RAW");
+			while (rawlenCritical.GetMicroSeconds() > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
+			{
+				//delete one of the most freqent RAWs
+				std::vector<uint16_t> counts;
+				for (auto& aid : criticalList)
+				{
+					counts.push_back(std::count_if(this->m_allSlots.begin(), this->m_allSlots.end(), [&aid](Slot& a){return a.GetAid() == aid;}));
+				}
+				auto mostFreqRawIt = std::max_element(counts.begin(), counts.end());
+				int mostFreqRawIndex = std::distance(counts.begin(), mostFreqRawIt);
+				int aidToDelete = criticalList[mostFreqRawIndex];
+				//find the last RAW with that AID
+				for (int i = m_rps->GetNumberOfRawGroups() - 1; i >= 0 ; i--)
+				{
+					if (m_rps->GetRawAssigmentObj(i).GetRawGroupAIDStart() == aidToDelete)
+					{
+						rawlenCritical -= m_rps->GetRawAssigmentObj(i).GetSlotDuration() * m_rps->GetRawAssigmentObj(i).GetSlotNum();
+						m_allSlots.erase(m_allSlots.begin()+i);
+						m_rps->DeleteRawAssigmentObj(i);
+						break;
+					}
+				}
+			}
+			//NS_ASSERT (false);
+		}
+		else if (rawlenSensors > Time() && this->m_sensorStations.size() > 0)
 		{
 			Time desiredDurationTotal = MicroSeconds(m_beaconInterval) - beaconTxDuration - rawlenCritical;
 			//NS_LOG_UNCOND ("sensors desiredDurationTotal = " << desiredDurationTotal);
@@ -1599,6 +1625,7 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 				}
 				i++;
 			}
+
 			if (!fixed)
 			{
 				NS_ASSERT (!rawIndexToDurationSensors.empty()); //if this is empty, critical RAWs are too long and I cannot shrink them. Too many control loops!
@@ -1607,6 +1634,7 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 				for (std::map<int, Time>::iterator it = rawIndexToDurationSensors.begin(); it != rawIndexToDurationSensors.end(); it++)
 				{
 					double scaledRawDuration = coef * (*it).second.GetMicroSeconds();
+					//NS_LOG_UNCOND ("scaledRawDuration = " << scaledRawDuration << ", slotnum = " << (int)m_rps->GetRawAssigmentObj((*it).first).GetSlotNum());
 					//TODO Slot durations are shrinked now. It could happen that slots are too short for 1 TX. I didn't handle this case
 					//In that case we should reduce the number of slots in order to increase the slot duration
 					uint16_t scaledCount = (scaledRawDuration / m_rps->GetRawAssigmentObj((*it).first).GetSlotNum()- 500) / 120;
@@ -1621,34 +1649,7 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 					//NS_LOG_UNCOND ("Multiple RAWs scaled down at beacon=" << this->currentId + 1);
 				}
 			}
-		}
-		else if (rawlenCritical.GetMicroSeconds() > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
-		{
-			NS_LOG_UNCOND ("Critical RAWs take more channel time than available. Delete the last most freq. RAW");
-			while (rawlenCritical.GetMicroSeconds() > m_beaconInterval - beaconTxDuration.GetMicroSeconds())
-			{
-				//delete one of the most freqent RAWs
-				std::vector<uint16_t> counts;
-				for (auto& aid : criticalList)
-				{
-					counts.push_back(std::count_if(this->m_allSlots.begin(), this->m_allSlots.end(), [&aid](Slot& a){return a.GetAid() == aid;}));
-				}
-				auto mostFreqRawIt = std::max_element(counts.begin(), counts.end());
-				int mostFreqRawIndex = std::distance(counts.begin(), mostFreqRawIt);
-				int aidToDelete = criticalList[mostFreqRawIndex];
-				//find the last RAW with that AID
-				for (int i = m_rps->GetNumberOfRawGroups() - 1; i >= 0 ; i--)
-				{
-					if (m_rps->GetRawAssigmentObj(i).GetRawGroupAIDStart() == aidToDelete)
-					{
-						rawlenCritical -= m_rps->GetRawAssigmentObj(i).GetSlotDuration() * m_rps->GetRawAssigmentObj(i).GetSlotNum();
-						m_allSlots.erase(m_allSlots.begin()+i);
-						m_rps->DeleteRawAssigmentObj(i);
-						break;
-					}
-				}
-			}
-			//NS_ASSERT (false);
+
 		}
 	}
 
