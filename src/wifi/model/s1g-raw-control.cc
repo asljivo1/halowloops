@@ -327,7 +327,7 @@ S1gRawCtr::S1gRawCtr ()
 	currentId = 0;
 	m_nTxs = 0;
 	m_prevRps = nullptr;
-	m_prevPrevRps = nullptr;
+	//m_prevPrevRps = nullptr;
 	m_rps = new RPS;
 }
 
@@ -1704,8 +1704,10 @@ S1gRawCtr::DistributeStationsToRaws ()
 		NS_LOG_UNCOND ("AID=" << aid << " is critical and has interval=" << sta->m_tInterval << ", m_tSent=" << sta->m_tSent << ", m_tSentPrev=" << sta->m_tSentPrev);
 		if (sta->m_tInterval != Time ())
 		{
-			Time reserve = sta->m_tInterval > MicroSeconds (m_beaconInterval) ? Simulator::Now() - 5 * sta->m_tInterval - MilliSeconds (10) : Simulator::Now() - 5 * MicroSeconds (m_beaconInterval);
-			if (sta->m_tSent + sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval) && sta->m_tSent > reserve && std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
+			Time sinceLastReception = sta->m_tSuccessLast;
+			if (sta->m_tSuccessLast > Simulator::Now() - 4 * sta->m_tInterval)
+			//Time reserve = sta->m_tInterval > MicroSeconds (m_beaconInterval) ? Simulator::Now() - 5 * sta->m_tInterval - MilliSeconds (10) : Simulator::Now() - 5 * MicroSeconds (m_beaconInterval);
+			//if (sta->m_tSent + sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval) && sta->m_tSent > reserve && std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
 			{
 				//I expect there will be at least 1 TX by sta in the next beacon
 				m_aidForcePage.push_back(sta->GetAid());
@@ -1727,6 +1729,7 @@ S1gRawCtr::DistributeStationsToRaws ()
 				criticalSlots.push_back(s);
 				continue;
 			}
+
 			uint16_t n (1);
 			while (sta->m_tSent + n * sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval))
 			{
@@ -2013,6 +2016,7 @@ void
 S1gRawCtr::deleteRps ()
 {
     delete m_rps;
+    delete m_prevRps;
 }
 
 void S1gRawCtr::gandalf()

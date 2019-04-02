@@ -29,6 +29,7 @@
 #include "supported-rates.h"
 #include "ns3/random-variable-stream.h"
 #include "rps.h"
+#include <memory>
 
 namespace ns3 {
     
@@ -283,7 +284,7 @@ private:
 	std::vector <Time> m_t_succ;
 	uint32_t m_nTxs = 0;
 	RPS *m_prevRps;
-	RPS *m_prevPrevRps;
+	std::unique_ptr<RPS> m_prevPrevRps;
 	RPS * m_rps;
 	uint64_t m_beaconInterval;
 
