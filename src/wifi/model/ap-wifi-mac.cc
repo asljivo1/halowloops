@@ -741,6 +741,8 @@ ApWifiMac::GetAllSlotNumbersFromAid (uint16_t aid) const
 	for (auto slotnum : myslotsVector)
 		std::cout <<slotnum << ", ";
 	std::cout << std::endl;*/
+	//NS_LOG_DEBUG ("edca size=" << m_rawSlotsEdca.size());
+
 	return myslotsVector;
 }
 
@@ -1424,9 +1426,9 @@ void ApWifiMac::SetaccessList(std::map<Mac48Address, bool> list) {
 }
 
 template <typename T>
-void delete_second_pointed_to (T* const it)
+void delete_pointed_to (T* const ptr)
 {
-	delete it->second;
+	delete ptr;
 }
 
 void ApWifiMac::SendOneBeacon(void) {
@@ -1551,7 +1553,7 @@ void ApWifiMac::SendOneBeacon(void) {
 			it++;
 		}
 
-
+		RPS *p_rps;
 		//NS_LOG_UNCOND ("AP -- m_sentToAids.size=" << m_sentToAids.size() << ", m_enqueuedToAids.size=" << m_enqueuedToAids.size());
 		if (this->m_criticalAids.size())
 		{
@@ -1559,8 +1561,23 @@ void ApWifiMac::SendOneBeacon(void) {
 			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
 			m_aidsForcePage = m_S1gRawCtr.GetAidsToForcePage();
 			UpdateQueues(rps);
-			int i = 0;
-			int oldNumRaws = m_rpsset.rpsset.at(0)->GetNumberOfRawGroups();
+			//clear RPS vector
+			std::for_each(m_rpsset.rpsset.begin(), m_rpsset.rpsset.end(), delete_pointed_to<RPS>);
+			m_rpsset.rpsset.clear();
+			//m_rpsset.setlen(0);
+
+			RPS *newRps = new RPS;
+			for (int i = 0; i < rps.GetNumberOfRawGroups(); i++)
+			{
+				RPS::RawAssignment *newRaw = new RPS::RawAssignment;
+				*newRaw = rps.GetRawAssigmentObj(i);
+				newRps->SetRawAssignment(*newRaw);
+				delete newRaw;
+			}
+
+			m_rpsset.rpsset.push_back(newRps);
+			p_rps = newRps;
+			/*int i = 0;
 			while (i < m_rpsset.rpsset.at(0)->GetNumberOfRawGroups())
 			{
 				if (rps.GetNumberOfRawGroups() > i)
@@ -1578,22 +1595,25 @@ void ApWifiMac::SendOneBeacon(void) {
 			{
 				m_rpsset.rpsset.at(0)->SetRawAssignment(rps.GetRawAssigmentObj(i));
 				i++;
+			}*/
+		}
+		else
+		{
+			if (RpsIndex < m_rpsset.rpsset.size()) {
+				p_rps = m_rpsset.rpsset.at(RpsIndex);
+				NS_LOG_INFO("< RpsIndex =" << RpsIndex);
+				RpsIndex++;
+			} else {
+				p_rps = m_rpsset.rpsset.at(0);
+				NS_LOG_INFO("RpsIndex =" << RpsIndex);
+				RpsIndex = 1;
 			}
 		}
 
 
-		RPS *p_rps;
-		if (RpsIndex < m_rpsset.rpsset.size()) {
-			p_rps = m_rpsset.rpsset.at(RpsIndex);
-			NS_LOG_INFO("< RpsIndex =" << RpsIndex);
-			RpsIndex++;
-		} else {
-			p_rps = m_rpsset.rpsset.at(0);
-			NS_LOG_INFO("RpsIndex =" << RpsIndex);
-			RpsIndex = 1;
-		}
+
 		std::ofstream os;
-		std::string outputpath = "./OptimalRawGroup/results-coap/lastaddedrpstobeacon.txt";
+		std::string outputpath = "lastaddedrpstobeacon.txt";
 		os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
 		p_rps->Print(os);
 		os.close();
@@ -1795,9 +1815,9 @@ void ApWifiMac::SendOneBeacon(void) {
 				bufferTimeToAllowBeaconToBeReceived;
 		NS_LOG_DEBUG(
 				"Transmission of beacon will take " << bufferTimeToAllowBeaconToBeReceived << ", delaying RAW start for that amount");
-
-		m_rawSlotsEdca[0].find(AC_VO)->second->SetRawSlotDuration(
-				m_sharedSlotDuration + m_bufferTimeToAllowBeaconToBeReceived);
+		m_sharedSlotDuration = this->m_beaconInterval -  m_bufferTimeToAllowBeaconToBeReceived;
+		NS_LOG_DEBUG ("set raw slot duration=" << m_sharedSlotDuration + m_bufferTimeToAllowBeaconToBeReceived << ", shared slot duration=" << m_sharedSlotDuration);
+		NotifyEdcaOfCsb(Simulator::Now() + m_bufferTimeToAllowBeaconToBeReceived, m_sharedSlotDuration, 1);
 
 		uint8_t nRaw;
 		nRaw = p_rps->GetNumberOfRawGroups();
@@ -2011,8 +2031,7 @@ void ApWifiMac::OnRAWSlotEnd(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 	}
 }
 
-void ApWifiMac::NotifyEdcaOfCsb(Time rawSlotStart, Time slotDuration,
-		bool csb) {
+void ApWifiMac::NotifyEdcaOfCsb(Time rawSlotStart, Time slotDuration, bool csb) {
 	// Since the following methods are static, it doesn-t matter which member of m_rawSlotsEdca vector we use
 	m_rawSlotsEdca[0].find(AC_VO)->second->SetRawStartTime(rawSlotStart);
 	m_rawSlotsEdca[0].find(AC_VO)->second->SetRawSlotDuration(slotDuration);
@@ -2047,7 +2066,7 @@ void ApWifiMac::OnRAWSlotStart(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 			m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(rawGroup - 1).GetSlotCrossBoundary()
 			== 0x01;
 	std::cout << "OnRawStart Access allowed to targetSlot=" << targetSlot << ", duration=" << slotDuration.GetMicroSeconds() << " us, csb=" << csb << std::endl;
-	NS_LOG_UNCOND ("aid allowed = " << GetCritAidFromSlotNum(targetSlot,*m_rpsset.rpsset.at(0)));
+	//NS_LOG_UNCOND ("aid start allowed = " << GetCritAidFromSlotNum(targetSlot,*m_rpsset.rpsset.at(0)));
 	//std::cout << "rps=" << (int)rps-1 << ", rawGroup=" << (int)rawGroup-1 << ", slot=" << (int)slot-1 << std::endl;
 	if (m_qosSupported) {
 		NotifyEdcaOfCsb(Simulator::Now(), slotDuration, csb);
@@ -2419,7 +2438,15 @@ ApWifiMac::UpdateQueues (RPS newRps)
 		m_rawSlotsEdca.push_back(edca);
 		//new_rawSlotsEdca.push_back(edca);
 	}
-
+	for (int i = 0; i < newTotalNumSlots; i++)
+	{
+		m_rawSlotsDca[i]->AccessAllowedIfRaw(false);
+		m_rawSlotsEdca[i].find(AC_VO)->second->AccessAllowedIfRaw(false);
+		m_rawSlotsEdca[i].find(AC_VI)->second->AccessAllowedIfRaw(false);
+		m_rawSlotsEdca[i].find(AC_BE)->second->AccessAllowedIfRaw(false);
+		m_rawSlotsEdca[i].find(AC_BK)->second->AccessAllowedIfRaw(false);
+	}
+    //return;
 	std::vector<uint16_t> pagedCpy (m_enqueuedToAids);
 	std::sort(pagedCpy.begin(), pagedCpy.end());
 	std::vector<uint16_t>::iterator unique_it;
@@ -2502,8 +2529,8 @@ ApWifiMac::UpdateQueues (RPS newRps)
 				else
 				{
 					NS_LOG_UNCOND ("problem in AP L2505");
-					NS_ASSERT (false);
-					//break;
+					//NS_ASSERT (false);
+					break;
 				}
 			}
 			currentPkt.GetFromEdca(m_rawSlotsEdca[targetSlot], AC_BE);
@@ -2555,9 +2582,10 @@ ApWifiMac::UpdateQueues (RPS newRps)
 			if (sum != 0)
 			{
 
-				NS_LOG_UNCOND ("+++QUEUES+ AID=" << *it << " peekedPackets_BE.size() " << peekedPackets_BE.size() << " packets enqueued in slot " << targetSlot);
+				//NS_LOG_UNCOND ("+++QUEUES+ AID=" << *it << " peekedPackets_BE.size() " << peekedPackets_BE.size() << " packets enqueued in slot " << targetSlot);
+				//NS_LOG_UNCOND ("new_allTargetSlots[0]=" << new_allTargetSlots[0]);
 				uint16_t aid_oldSlot = this->GetCritAidFromSlotNum (new_allTargetSlots[0], *m_rpsset.rpsset.at(0));
-				NS_LOG_UNCOND ("+++QUEUES+ PACKETS MUST BE ENQUEUED TO NEW SLOT " << new_allTargetSlots[0]);
+				NS_LOG_DEBUG ("AID=" << *it << " moves " << peekedPackets_BE.size() << " packets from previous slot=" << targetSlot << " to new slot= "<< new_allTargetSlots[0]);
 
 				WifiMacHeader hdr;
 				if (m_qosSupported)
@@ -2653,7 +2681,11 @@ ApWifiMac::UpdateQueues (RPS newRps)
 							while (m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->GetSize() > 0)
 							{
 								auto newPkt = m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, otherdest);
-								//NS_ASSERT (tid == QosUtilsGetTidForPacket(newPkt));
+								if (newPkt == 0)
+								{
+									//these packets here are already *it's packets enqueued from some previous targetSlot, ignore
+									break;
+								}
 								tempStoragePackets[aid_oldSlot].push_back(newPkt);
 								tempStorageAcIndices[aid_oldSlot].push_back(AC_BE);
 								m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->Remove(newPkt);
@@ -2856,21 +2888,6 @@ ApWifiMac::UpdateQueues (RPS newRps)
 	}
 	//assign current packets from tempCurrentPackets
 	AssignCurrentPacketsToQueues (tempCurrentPackets, newRps);
-
-	for (int i = 0; i < newTotalNumSlots; i++)
-	{
-		/*NS_LOG_UNCOND ("slot=" << i << ", accessAllowed: VO=" << m_rawSlotsEdca[i].find(AC_VO)->second->AccessIfRaw
-									<< ", VI=" << m_rawSlotsEdca[i].find(AC_VI)->second->AccessIfRaw
-									<< ", BE=" << m_rawSlotsEdca[i].find(AC_BE)->second->AccessIfRaw
-									<< ", BK=" << m_rawSlotsEdca[i].find(AC_BK)->second->AccessIfRaw);*/
-
-		m_rawSlotsDca[i]->AccessAllowedIfRaw(false);
-		m_rawSlotsEdca[i].find(AC_VO)->second->AccessAllowedIfRaw(false);
-		m_rawSlotsEdca[i].find(AC_VI)->second->AccessAllowedIfRaw(false);
-		m_rawSlotsEdca[i].find(AC_BE)->second->AccessAllowedIfRaw(false);
-		m_rawSlotsEdca[i].find(AC_BK)->second->AccessAllowedIfRaw(false);
-	}
-
 }
 
 void
