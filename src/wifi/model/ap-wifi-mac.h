@@ -156,13 +156,16 @@ private:
   		CurrentPacket ();
   		~CurrentPacket ();
   		void GetFromEdca (EdcaQueues edca, AcIndex type);
-  		void SetToEdca (CurrentPacket pkt, EdcaQueues edca, AcIndex type);
+  		void SetToEdca (EdcaQueues edca);
   		void ResetEdca (EdcaQueues edca, AcIndex type);
 
   		void GetFromDca (Ptr<DcaTxop> dca);
   		void SetToDca (CurrentPacket pkt, Ptr<DcaTxop> dca);
   		void ResetDca (Ptr<DcaTxop> dca);
+  		AcIndex GetAcIndex (void) const;
+  		void SetAcIndex (AcIndex acIndex);
 
+  		AcIndex m_acIndex;
   		Ptr<const Packet> m_currentPacket;
   		WifiMacHeader m_currentHdr;
   		Time m_currentPktTimestamp;
