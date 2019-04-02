@@ -3,9 +3,7 @@
 Configuration::Configuration() {
     
 }
-Configuration::~Configuration() {
 
-}
 Configuration::Configuration(int argc, char *argv[]) {
     CommandLine cmd;
     /*cmd.AddValue("useIpv6", "Use Ipv6 (true/false)", useV6);

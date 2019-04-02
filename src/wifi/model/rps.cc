@@ -278,6 +278,7 @@ RPS::ReplaceRawAssignmentAt (RPS::RawAssignment raw, uint16_t index)
 
 	m_rps = &m_rpsarry[0];
 
+	os << "\nReplace raw at index=" << index << "\n";
 	os << "\nNEW RAW\n";
 	this->Print(os);
 	os.close();
@@ -422,13 +423,13 @@ RPS::DeleteRawAssigmentObj (uint32_t raw_index)
 
 	/*m_rpsarry.erase(m_rpsarry.begin() + raw_index, m_rpsarry.begin() + raw_index + 6);
 	m_length -= 6;*/
-	for (int i = raw_index; i < RAW_number; i++)
+	for (int i = raw_index; i < RAW_number-1; i++)
 		for (int j = 0; j < 6; j++)
 		{
-			m_rpsarry[raw_index*rawAssignment_len+j] = m_rpsarry[(raw_index + 1)*rawAssignment_len+j];
-			m_length--;
+			m_rpsarry[i*rawAssignment_len+j] = m_rpsarry[(i + 1)*rawAssignment_len+j];
 		}
 	m_rpsarry.resize(6 * (RAW_number - 1));
+	m_length -= 6;
 	m_rps = &m_rpsarry[0];
 
 	os << "\nNEW RAW\n";

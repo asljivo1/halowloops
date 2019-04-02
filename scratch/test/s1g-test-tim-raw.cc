@@ -150,7 +150,6 @@ RPSVector configureRAW (RPSVector rpslist, string RAWConfigFile)
 			config.NGroup = ngroup;
 			for (uint16_t i = 0; i < NRAWPERBEACON; i++) // raw groups in one beacon
 			{
-				//RPS *m_rps = new RPS;
 				RPS::RawAssignment *m_raw = new RPS::RawAssignment;
 
 				myfile >> Value;
@@ -674,7 +673,7 @@ void onChannelTransmission(Ptr<NetDevice> senderDevice, Ptr<Packet> packet) {
 	int rawGroup = currentRawGroup - 1;
 	int slotIndex = currentRawSlot - 1;
 	//cout << rpsIndex << "		" << rawGroup << "		" << slotIndex << "		" << endl;
-
+/*
 	uint64_t iSlot = slotIndex;
 	if (rpsIndex > 0)
 		for (int r = rpsIndex - 1; r >= 0; r--)
@@ -708,7 +707,7 @@ void onChannelTransmission(Ptr<NetDevice> senderDevice, Ptr<Packet> packet) {
 	//std::cout << "------------- packetSerializedSize = " << packet->GetSerializedSize() << std::endl;
 	//std::cout << "------------- txAP[" << iSlot <<"] = " << transmissionsPerTIMGroupAndSlotFromAPSinceLastInterval[iSlot] << std::endl;
 	//std::cout << "------------- txSTA[" << iSlot <<"] = " << transmissionsPerTIMGroupAndSlotFromSTASinceLastInterval[iSlot] << std::endl;
-
+*/
 }
 
 int getSTAIdFromAddress(Ipv4Address from) {
