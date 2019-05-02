@@ -448,8 +448,14 @@ def configure(conf):
     # Enable C++-11 support
     env.append_value('CXXFLAGS', '-std=c++11')
 
+
+    #check if gurobi is ok
+    env['gurobi'] = conf.check(mandatory = True, lib = 'gurobi_c++', uselib_store='gurobi')
+    have_gurobi = conf.check_nonfatal(header_name='gurobi_c++.h', define_name = 'HAVE_GUROBI', use='gurobi')
     # Set this so that the lists won't be printed at the end of this
     # configure command.
+
+
     conf.env['PRINT_BUILT_MODULES_AT_END'] = False
 
     conf.env['MODULES_NOT_BUILT'] = []
@@ -698,7 +704,7 @@ def create_ns3_program(bld, name, dependencies=('core',)):
         if program.env.DEST_BINFMT == 'elf':
             # All ELF platforms are impacted but only the gcc compiler has a flag to fix it.
             if 'gcc' in (program.env.CXX_NAME, program.env.CC_NAME): 
-                program.env.append_value ('SHLIB_MARKER', '-Wl,--no-as-needed')
+                program.env.append_value ('SHLIB_MARKER', '-Wl,--no-as-needed,-lglpk,-lm,-lgurobi_c++,-lgurobi81')
 
     return program
 
