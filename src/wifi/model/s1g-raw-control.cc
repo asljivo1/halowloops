@@ -1330,10 +1330,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     	 //initial
     	 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
     	 uint32_t duration = 500 + count * 120;
-    	 RPS::RawAssignment *m_raw = new RPS::RawAssignment; //loop's RAW, unless there is no loops in this TIM
-    	 m_raw->SetRawControl(0);  //support paged STA or not
-    	 m_raw->SetSlotCrossBoundary(1);
-    	 m_raw->SetSlotFormat (1);
+
     	 //assign RAW slots to critical STAs
 
     	 //Assumption: All critical stations have aids 1, 2, ..., N whereas sensors have aids from N+1 onwards
@@ -1355,20 +1352,32 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 //loops are in this tim
     				 uint16_t aid_start = currentIndex == 0 ? 1 : currentIndex * 64;
     				 uint16_t aid_end = maxaidcrit < (currentIndex + 1) * 64 ? maxaidcrit : (currentIndex + 1) * 64 - 1;
-    				 uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | page;
-    				 m_raw->SetRawGroup(rawinfo);
-    				 m_raw->SetSlotNum(aid_end - aid_start + 1);
-    				 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
-    				 if (count < 256)
-    					 m_raw->SetSlotFormat(0);
-    				 else if (count < 2048)
-    					 m_raw->SetSlotFormat(1);
-    				 m_raw->SetSlotDurationCount(count);
-    				 m_rps->SetRawAssignment(*m_raw);
+    				 for (int r = aid_start; r <= aid_end; r++)
+    				 {
+    					 RPS::RawAssignment *m_raw = new RPS::RawAssignment; //loop's RAW, unless there is no loops in this TIM
+    					 m_raw->SetRawControl(0);  //support paged STA or not
+    					 m_raw->SetSlotCrossBoundary(1);
+    					 m_raw->SetSlotFormat (1);
+    					 uint32_t rawinfo = (r << 13) | (r << 2) | page;
+    					 m_raw->SetRawGroup(rawinfo);
+    					 m_raw->SetSlotNum(1);
+    					 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
+    					 if (count < 256)
+    						 m_raw->SetSlotFormat(0);
+    					 else if (count < 2048)
+    						 m_raw->SetSlotFormat(1);
+    					 m_raw->SetSlotDurationCount(count);
+    					 m_rps->SetRawAssignment(*m_raw);
+    					 delete m_raw;
+    				 }
     			 }
     			 else
     			 {
     				 //loops are not in this tim; assign to sensors (there is no offload stations in my experiments so I am not considering them)
+    				 RPS::RawAssignment *m_raw = new RPS::RawAssignment; //loop's RAW, unless there is no loops in this TIM
+    				 m_raw->SetRawControl(0);  //support paged STA or not
+    				 m_raw->SetSlotCrossBoundary(1);
+    				 m_raw->SetSlotFormat (1);
     				 uint16_t aid_start = currentIndex == 0 ? 1 : currentIndex * 64;
     				 auto maxaidsensor = *std::max_element(sensorList.begin(), sensorList.end());
     				 uint16_t aid_end = maxaidsensor < (currentIndex + 1) * 64 ? maxaidsensor : (currentIndex + 1) * 64 - 1;
@@ -1382,6 +1391,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     					 m_raw->SetSlotFormat(1);
     				 m_raw->SetSlotDurationCount(count);
     				 m_rps->SetRawAssignment(*m_raw);
+    				 delete m_raw;
     			 }
 
 
@@ -1392,38 +1402,49 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     			 //loops' RAW
     			 uint16_t aid_start = *std::min_element(criticalList.begin(), criticalList.end());
     			 uint16_t aid_end = *std::max_element(criticalList.begin(), criticalList.end());
-    			 uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | page;
-    			 m_raw->SetRawGroup(rawinfo);
-    			 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
-    			 if (count < 256)
-    				 m_raw->SetSlotFormat(0);
-    			 else if (count < 2048)
-    				 m_raw->SetSlotFormat(1);
-    			 m_raw->SetSlotDurationCount(count);
-    			 uint32_t numslots;
-    			 m_raw->SetSlotNum(criticalList.size());
-    			 uint32_t duration = 500 + 120 * count;
-    			 NS_LOG_UNCOND ("bufferTimeToAllowBeaconToBeReceived us = " << bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds());
-    			 if (duration * criticalList.size() >= m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds())
+    			 for (int r = aid_start; r <= aid_end; r++)
     			 {
-    				 count = 1 + (2 * 1240 - 500) / 120;
-    				 duration = 500 + 120 * count;
+    				 RPS::RawAssignment *m_raw = new RPS::RawAssignment; //loop's RAW, unless there is no loops in this TIM
+    				 m_raw->SetRawControl(0);  //support paged STA or not
+    				 m_raw->SetSlotCrossBoundary(1);
+    				 m_raw->SetSlotFormat (1);
+    				 uint32_t rawinfo = (r << 13) | (r << 2) | page;
+    				 m_raw->SetRawGroup(rawinfo);
+    				 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
+    				 if (count < 256)
+    					 m_raw->SetSlotFormat(0);
+    				 else if (count < 2048)
+    					 m_raw->SetSlotFormat(1);
     				 m_raw->SetSlotDurationCount(count);
+    				 //uint32_t numslots;
+    				 m_raw->SetSlotNum(1);
+    				 uint32_t duration = 500 + 120 * count;
+    				 NS_LOG_UNCOND ("bufferTimeToAllowBeaconToBeReceived us = " << bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds());
     				 if (duration * criticalList.size() >= m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds())
     				 {
-    					 NS_LOG_UNCOND ("CANNOT ASSIGN SEPARATE SLOT TO " << criticalList.size() << " CRITICAL STATIONS!");
-    					 numslots = (m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds()) / (500 + 120 * count);
-    					 m_raw->SetSlotNum(numslots);
+    					 count = 1 + (2 * 1240 - 500) / 120;
+    					 duration = 500 + 120 * count;
+    					 m_raw->SetSlotDurationCount(count);
+    					 if (duration * criticalList.size() >= m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds())
+    					 {
+    						 NS_LOG_UNCOND ("CANNOT ASSIGN SEPARATE SLOT TO " << criticalList.size() << " CRITICAL STATIONS!");
+    						 //numslots = (m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds()) / (500 + 120 * count);
+    						 m_raw->SetSlotNum(1);
+    					 }
     				 }
+    				 m_rps->SetRawAssignment(*m_raw);
+    				 delete m_raw;
     			 }
-    			 m_rps->SetRawAssignment(*m_raw);
-
     			 // rest of the stations' RAW
     			 if (!sensorList.empty())
     			 {
+    				 RPS::RawAssignment *m_raw = new RPS::RawAssignment; //loop's RAW, unless there is no loops in this TIM
+    				 m_raw->SetRawControl(0);  //support paged STA or not
+    				 m_raw->SetSlotCrossBoundary(1);
+    				 m_raw->SetSlotFormat (1);
     				 aid_start = *std::min_element(sensorList.begin(), sensorList.end());
     				 aid_end = *std::max_element(sensorList.begin(), sensorList.end());
-    				 rawinfo = (aid_end << 13) | (aid_start << 2) | page;
+    				 uint32_t rawinfo = (aid_end << 13) | (aid_start << 2) | page;
     				 m_raw->SetRawGroup(rawinfo);
     				 count = (m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds() - m_rps->GetRawAssigmentObj(0).GetSlotDuration().GetMicroSeconds() * m_rps->GetRawAssigmentObj(0).GetSlotNum() - 500) / 120;
     				 //NS_LOG_UNCOND ("--count=" << count);
@@ -1434,11 +1455,12 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 m_raw->SetSlotDurationCount(count);
     				 m_raw->SetSlotNum(1);
     				 m_rps->SetRawAssignment(*m_raw);
+    				 delete m_raw;
     			 }
 
     		 }
     	 }
-    	 delete m_raw;
+
     	 this->m_prevRps = new RPS;
     	 *m_prevRps = *m_rps;
      }
@@ -1706,7 +1728,7 @@ S1gRawCtr::DistributeStationsToRaws ()
 		if (sta->m_tInterval != Time ())
 		{
 			Time sinceLastReception = sta->m_tSuccessLast;
-			if (sta->m_tSuccessLast > Simulator::Now() - 4 * sta->m_tInterval)
+			if (sta->m_tSuccessLast > Simulator::Now() - 10 * sta->m_tInterval)
 			//Time reserve = sta->m_tInterval > MicroSeconds (m_beaconInterval) ? Simulator::Now() - 5 * sta->m_tInterval - MilliSeconds (10) : Simulator::Now() - 5 * MicroSeconds (m_beaconInterval);
 			//if (sta->m_tSent + sta->m_tInterval < Simulator::Now() + MicroSeconds (this->m_beaconInterval) && sta->m_tSent > reserve && std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
 			{

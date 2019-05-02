@@ -38,7 +38,7 @@
 #include "ns3/traced-value.h"
 #include "ns3/trace-source-accessor.h"
 #include "mgt-headers.h"
-
+#include <tuple>
 
 
 namespace ns3 {
@@ -382,6 +382,7 @@ private:
 
   Time m_scheduleTransmissionForNextSlotIfLessThan;
   bool m_alwaysScheduleForNextSlot;
+  std::vector<std::tuple<uint16_t, uint16_t, uint32_t> >  m_StartaidEndaidToEdcaIndexes;
 };
 
 } //namespace ns3

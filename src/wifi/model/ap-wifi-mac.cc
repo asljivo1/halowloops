@@ -508,21 +508,25 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 		aid++;
 	} while (m_AidToMacAddr.find(aid)->second != to); //TODO optimize search
 
+	auto tupit = std::find_if (m_StartaidEndaidToEdcaIndexes.begin(), m_StartaidEndaidToEdcaIndexes.end(), [&aid](const std::tuple<uint16_t, uint16_t, uint32_t> a){return (std::get<0>(a) <= aid && std::get<1>(a) >= aid);});
+	if (tupit != m_StartaidEndaidToEdcaIndexes.end())
+	{
+		uint32_t edcaIndex = std::get<2>(*tupit);
+
+		if (m_qosSupported) {
+			//Sanity check that the TID is valid
+			NS_ASSERT(tid < 8);
 
 
-	if (m_qosSupported) {
-		//Sanity check that the TID is valid
-		NS_ASSERT(tid < 8);
-		uint32_t targetSlot = GetNextSlotNumFromAid(aid);
-		NS_LOG_INFO(
-					Simulator::Now().GetMicroSeconds() << " ms: AP to forward data for [aid=" << aid << "] to slot=" << targetSlot);
-		// if paged both in DTIM and in TIM enqueue immediately
-		if (IsPagedInDtim (aid))
-		{
-			m_rawSlotsEdca[targetSlot][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
-			NS_LOG_DEBUG("[aid=" << aid <<"] paged in this DTIM, AP enqueues to targetSlot=" << targetSlot);
+			//int targetSlot = GetNextSlotNumFromAid(aid);
+			NS_LOG_INFO(
+					Simulator::Now().GetMicroSeconds() << " ms: AP to forward data for [aid=" << aid << "]" );
+			// if paged both in DTIM and in TIM enqueue immediately
+			/*if (IsPagedInDtim (aid))
+		{*/
+			m_rawSlotsEdca[edcaIndex][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
 			this->m_enqueuedToAids.push_back(aid);
-		}
+			/*}
 		else
 		{
 
@@ -578,13 +582,11 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 					this->m_enqueuedToAids.push_back(aid);
 				}
 			}
+		}*/
+		} else {
+			// queue the packet in the specific raw slot period DCA
+			m_rawSlotsDca[edcaIndex]->Queue(packet, hdr);
 		}
-		//else enqueue after it is paged (next DTIM)
-		NS_LOG_UNCOND ("AP m_enqueuedToAids.size=" << m_enqueuedToAids.size());
-	} else {
-		// queue the packet in the specific raw slot period DCA
-		m_rawSlotsDca[GetNextSlotNumFromAid(aid)]->Queue(packet, hdr);
-		//m_dca->Queue (packet, hdr);
 	}
 
 }
@@ -1345,34 +1347,22 @@ bool ApWifiMac::HasPacketsInQueueTo(Mac48Address dest) {
 		aid++;
 	} while (m_AidToMacAddr.find(aid)->second != dest); //TODO optimize search
 
-	std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (aid);
-	for (auto targetSlot : allTargetSlots)
+	auto tupit = std::find_if (m_StartaidEndaidToEdcaIndexes.begin(), m_StartaidEndaidToEdcaIndexes.end(), [&aid](const std::tuple<uint16_t, uint16_t, uint32_t> a){return (std::get<0>(a) <= aid && std::get<1>(a) >= aid);});
+	if (tupit != m_StartaidEndaidToEdcaIndexes.end())
 	{
-		peekedPacket_VO =
-				m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(
-						WifiMacHeader::ADDR1, dest);
-		peekedPacket_VI =
-				m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(
-						WifiMacHeader::ADDR1, dest);
-		peekedPacket_BE =
-				m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(
-						WifiMacHeader::ADDR1, dest);
-		peekedPacket_BK =
-				m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(
-						WifiMacHeader::ADDR1, dest);
+		uint32_t edcaIndex = std::get<2>(*tupit);
+
+		/*std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (aid);
+	for (auto targetSlot : allTargetSlots)
+	{*/
+		peekedPacket_VO = m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest);
+		peekedPacket_VI = m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest);
+		peekedPacket_BE = m_rawSlotsEdca[edcaIndex].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest);
+		peekedPacket_BK = m_rawSlotsEdca[edcaIndex].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(WifiMacHeader::ADDR1, dest);
 		if (peekedPacket_VO != 0 || peekedPacket_VI != 0 || peekedPacket_BE != 0 || peekedPacket_BK != 0)
 			return true;
 		//NS_LOG_UNCOND("TRUE");
 	}
-	/*peekedPacket_VO = m_edca.find(AC_VO)->second->GetEdcaQueue()->PeekByAddress (WifiMacHeader::ADDR1, dest);
-	 peekedPacket_VI = m_edca.find(AC_VI)->second->GetEdcaQueue()->PeekByAddress (WifiMacHeader::ADDR1, dest);
-	 peekedPacket_BE = m_edca.find(AC_BE)->second->GetEdcaQueue()->PeekByAddress (WifiMacHeader::ADDR1, dest);
-	 peekedPacket_BK = m_edca.find(AC_BK)->second->GetEdcaQueue()->PeekByAddress (WifiMacHeader::ADDR1, dest);
-	 */
-	/*if (peekedPacket_VO != 0 || peekedPacket_VI != 0 || peekedPacket_BE != 0 || peekedPacket_BK != 0) {
-		return true;
-	}*/
-	//NS_LOG_UNCOND("FALSE");
 	return false;
 
 }
@@ -1398,31 +1388,19 @@ void ApWifiMac::SetaccessList(std::map<Mac48Address, bool> list) {
 		/*uint32_t targetSlot = GetNextSlotNumFromAid(aid);
 		//std::cout << "________________aid=" << (int)aid << ", targetslot=" << targetSlot << std::endl;*/
 
-		std::vector <uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (aid);
+		/*std::vector <uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (aid);
 		for (auto targetSlot : allTargetSlots)
+		{*/
+		auto tupit = std::find_if (m_StartaidEndaidToEdcaIndexes.begin(), m_StartaidEndaidToEdcaIndexes.end(), [&aid](const std::tuple<uint16_t, uint16_t, uint32_t> a){return (std::get<0>(a) <= aid && std::get<1>(a) >= aid);});
+		if (tupit != m_StartaidEndaidToEdcaIndexes.end())
 		{
-			m_rawSlotsEdca[targetSlot].find(AC_VO)->second->SetaccessList(list);
-			m_rawSlotsEdca[targetSlot].find(AC_VI)->second->SetaccessList(list);
-			m_rawSlotsEdca[targetSlot].find(AC_BE)->second->SetaccessList(list);
-			m_rawSlotsEdca[targetSlot].find(AC_BK)->second->SetaccessList(list);
+			uint32_t edcaIndex = std::get<2>(*tupit);
+			m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->SetaccessList(list);
+			m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->SetaccessList(list);
+			m_rawSlotsEdca[edcaIndex].find(AC_BE)->second->SetaccessList(list);
+			m_rawSlotsEdca[edcaIndex].find(AC_BK)->second->SetaccessList(list);
 		}
-		//NS_LOG_UNCOND ("aid " << aid << "stasAddr " << stasAddr);
-		//NS_LOG_UNCOND ( "aid "  << k << ", send " << list.find(stasAddr)->second << ", at " << Simulator::Now () << ", size " << list.size ());
-
 	}
-
-	/*for (auto& q : m_rawSlotsEdca)
-	 {
-	 q.find (AC_VO)->second->SetaccessList (list);
-	 q.find (AC_VI)->second->SetaccessList (list);
-	 q.find (AC_BE)->second->SetaccessList (list);
-	 q.find (AC_BK)->second->SetaccessList (list);
-	 }*/
-
-	/*m_edca.find (AC_VO)->second->SetaccessList (list);
-	 m_edca.find (AC_VI)->second->SetaccessList (list);
-	 m_edca.find (AC_BE)->second->SetaccessList (list);
-	 m_edca.find (AC_BK)->second->SetaccessList (list);*/
 }
 
 template <typename T>
@@ -1459,66 +1437,70 @@ void ApWifiMac::SendOneBeacon(void) {
 		it = this->m_criticalAids.begin();
 		while ( it != m_criticalAids.end())
 		{
-			std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (*it);
+			//std::vector<uint32_t> allTargetSlots = GetAllSlotNumbersFromAid (*it);
 			auto dest = this->m_AidToMacAddr.find(*it)->second;
 
 			int qlen = 0;
-			for (auto targetSlot : allTargetSlots)
+			auto tupit = std::find_if (m_StartaidEndaidToEdcaIndexes.begin(), m_StartaidEndaidToEdcaIndexes.end(), [&it](const std::tuple<uint16_t, uint16_t, uint32_t> a){return (std::get<0>(a) <= *it && std::get<1>(a) >= *it);});
+			if (tupit != m_StartaidEndaidToEdcaIndexes.end())
 			{
-				int qsize = m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetEdcaQueue()->GetSize();
+			uint32_t edcaIndex = std::get<2>(*tupit);
+			/*for (auto targetSlot : allTargetSlots)
+			{*/
+				int qsize = m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->GetEdcaQueue()->GetSize();
 				std::vector<Ptr<const Packet> > peekedPackets_VO;
 				while (qsize > 0)
 				{
-					peekedPackets_VO.push_back(m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(
+					peekedPackets_VO.push_back(m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->GetEdcaQueue()->PeekByAddress(
 							WifiMacHeader::ADDR1, dest));
 					qsize--;
 				}
-				Ptr<const Packet> currentPkt = m_rawSlotsEdca[targetSlot].find(AC_VO)->second->GetCurrentPacket();
+				Ptr<const Packet> currentPkt = m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->GetCurrentPacket();
 				if (currentPkt != 0)
 				{
 					peekedPackets_VO.insert(peekedPackets_VO.begin(), currentPkt);
 					//m_rawSlotsEdca[targetSlot].find(AC_VO)->second->ResetCurrentPacket();
 				}
 
-				qsize =  m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->GetSize();
+				qsize =  m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->GetEdcaQueue()->GetSize();
 				std::vector<Ptr<const Packet> > peekedPackets_VI;
 				while (qsize > 0)
 				{
-					peekedPackets_VI.push_back(m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(
+					peekedPackets_VI.push_back(m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->GetEdcaQueue()->PeekByAddress(
 							WifiMacHeader::ADDR1, dest));
 					qsize--;
 				}
-				currentPkt = m_rawSlotsEdca[targetSlot].find(AC_VI)->second->GetCurrentPacket();
+				currentPkt = m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->GetCurrentPacket();
 				if (currentPkt != 0)
 				{
 					peekedPackets_VI.insert(peekedPackets_VI.begin(), currentPkt);
 					//m_rawSlotsEdca[targetSlot].find(AC_VI)->second->ResetCurrentPacket();
 				}
 
-				qsize =  m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->GetSize();
+				qsize =  m_rawSlotsEdca[edcaIndex].find(AC_BE)->second->GetEdcaQueue()->GetSize();
 				std::vector<Ptr<const Packet> > peekedPackets_BE;
 				while (qsize > 0)
 				{
-					peekedPackets_BE.push_back(m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(
+					peekedPackets_BE.push_back(m_rawSlotsEdca[edcaIndex].find(AC_BE)->second->GetEdcaQueue()->PeekByAddress(
 							WifiMacHeader::ADDR1, dest));
 					qsize--;
 				}
-				currentPkt = m_rawSlotsEdca[targetSlot].find(AC_BE)->second->GetCurrentPacket();
+				currentPkt = m_rawSlotsEdca[edcaIndex].find(AC_BE)->second->GetCurrentPacket();
 				if (currentPkt != 0)
 				{
 					peekedPackets_BE.insert(peekedPackets_BE.begin(), currentPkt);
 					//m_rawSlotsEdca[targetSlot].find(AC_BE)->second->ResetCurrentPacket();
 				}
 
-				qsize =  m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->GetSize();
+				qsize =  m_rawSlotsEdca[edcaIndex].find(AC_BK)->second->GetEdcaQueue()->GetSize();
 				std::vector<Ptr<const Packet> > peekedPackets_BK;
 				while (qsize > 0)
 				{
-					peekedPackets_BK.push_back(m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(
+					peekedPackets_BK.push_back(m_rawSlotsEdca[edcaIndex].find(AC_BK)->second->GetEdcaQueue()->PeekByAddress(
 							WifiMacHeader::ADDR1, dest));
 					qsize--;
 				}
-				currentPkt = m_rawSlotsEdca[targetSlot].find(AC_BK)->second->GetCurrentPacket();
+				currentPkt = m_rawSlotsEdca[edcaIndex].find(AC_BK)->second->GetCurrentPacket();
 				if (currentPkt != 0)
 				{
 					peekedPackets_BK.insert(peekedPackets_BK.begin(), currentPkt);
@@ -1528,7 +1510,7 @@ void ApWifiMac::SendOneBeacon(void) {
 				if (peekedPackets_VO.size() != 0 || peekedPackets_VI.size() != 0 || peekedPackets_BE.size() != 0 || peekedPackets_BK.size() != 0)
 				{
 					qlen += peekedPackets_VO.size() + peekedPackets_VI.size() + peekedPackets_BE.size() + peekedPackets_BK.size();
-					NS_LOG_UNCOND ("Slot " << targetSlot << " has qlen=" << qlen << " packets enqueued for aid=" << (int)(*it));
+					NS_LOG_UNCOND ("There are " << qlen << " packets enqueued for aid=" << (int)(*it));
 
 				}
 			}
@@ -1956,16 +1938,15 @@ void ApWifiMac::OnRAWSlotEnd(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 	NS_LOG_FUNCTION(this);
 	LOG_TRAFFIC(
 			"AP RAW SLOT END FOR TIM GROUP " << int(rawGroup - 1) << " SLOT " << int(slot - 1));
-	uint32_t targetSlot = this->GetSlotNumFromRpsRawSlot(rps, rawGroup, slot);
+	//uint32_t targetSlot = this->GetSlotNumFromRpsRawSlot(rps, rawGroup, slot);
 	//Time slotDuration = MicroSeconds(m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(rawGroup - 1).GetSlotDurationCount() * 120 + 500);
 	//std::cout << "OnRAWSlotEnd Access DENIED to targetSlot=" << targetSlot << std::endl;
 
 	Time totalRawDuration = Time();
-	uint32_t numberOfRawGroupsInThisRps = m_rpsset.rpsset.at(
-			m_rpsIndexTrace - 1)->GetNumberOfRawGroups();
-	for (uint32_t i = 0; i < numberOfRawGroupsInThisRps; i++) {
-		auto ass = m_rpsset.rpsset.at(m_rpsIndexTrace - 1)->GetRawAssigmentObj(
-				i);
+	uint32_t numberOfRawGroupsInThisRps = m_rpsset.rpsset.at(m_rpsIndexTrace - 1)->GetNumberOfRawGroups();
+	for (uint32_t i = 0; i < numberOfRawGroupsInThisRps; i++)
+	{
+		auto ass = m_rpsset.rpsset.at(m_rpsIndexTrace - 1)->GetRawAssigmentObj(i);
 		totalRawDuration += ass.GetSlotDuration() * ass.GetSlotNum();
 	}
 	// TODO: When RAW start time can be arbitrary, then adjust sharedSlotDuration in between sequential RAW groups
@@ -2010,24 +1991,27 @@ void ApWifiMac::OnRAWSlotEnd(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 				m_rpsset.rpsset.at(0)->GetRawAssigmentObj(0).GetSlotCrossBoundary()
 				== 0x01;
 	}
-
-	if (m_qosSupported) {
-		NotifyEdcaOfCsb(Simulator::Now(), m_sharedSlotDuration, csb);
-		m_rawSlotsEdca[targetSlot].find(AC_VO)->second->AccessAllowedIfRaw(
-				false);
-		m_rawSlotsEdca[targetSlot].find(AC_VI)->second->AccessAllowedIfRaw(
-				false);
-		m_rawSlotsEdca[targetSlot].find(AC_BE)->second->AccessAllowedIfRaw(
-				false);
-		m_rawSlotsEdca[targetSlot].find(AC_BK)->second->AccessAllowedIfRaw(
-				false);
-		m_rawSlotsEdca[targetSlot].find(AC_VO)->second->OutsideRawStart();
-		m_rawSlotsEdca[targetSlot].find(AC_VI)->second->OutsideRawStart();
-		m_rawSlotsEdca[targetSlot].find(AC_BE)->second->OutsideRawStart();
-		m_rawSlotsEdca[targetSlot].find(AC_BK)->second->OutsideRawStart();
-	} else {
-		m_rawSlotsDca[targetSlot]->AccessAllowedIfRaw(false);
-		m_rawSlotsDca[targetSlot]->OutsideRawStart();
+	uint16_t aid = m_rpsset.rpsset.at(m_rpsIndexTrace - 1)->GetRawAssigmentObj(rawGroup - 1).GetRawGroupAIDStart();
+	auto tupit = std::find_if (m_StartaidEndaidToEdcaIndexes.begin(), m_StartaidEndaidToEdcaIndexes.end(), [&aid](const std::tuple<uint16_t, uint16_t, uint32_t> a){return (std::get<0>(a) <= aid && std::get<1>(a) >= aid);});
+	if (tupit != m_StartaidEndaidToEdcaIndexes.end())
+	{
+		uint32_t edcaIndex = std::get<2>(*tupit);
+		if (m_qosSupported) {
+			NotifyEdcaOfCsb(Simulator::Now(), m_sharedSlotDuration, csb);
+			m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->AccessAllowedIfRaw(false);
+			m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->AccessAllowedIfRaw(false);
+			m_rawSlotsEdca[edcaIndex].find(AC_BE)->second->AccessAllowedIfRaw(false);
+			m_rawSlotsEdca[edcaIndex].find(AC_BK)->second->AccessAllowedIfRaw(false);
+			m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->OutsideRawStart();
+			m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->OutsideRawStart();
+			m_rawSlotsEdca[edcaIndex].find(AC_BE)->second->OutsideRawStart();
+			m_rawSlotsEdca[edcaIndex].find(AC_BK)->second->OutsideRawStart();
+		}
+		else
+		{
+			m_rawSlotsDca[edcaIndex]->AccessAllowedIfRaw(false);
+			m_rawSlotsDca[edcaIndex]->OutsideRawStart();
+		}
 	}
 }
 
@@ -2057,7 +2041,7 @@ void ApWifiMac::OnRAWSlotStart(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 
 	m_rawSlotStarted(rawGroup - 1, slot - 1);
 
-	uint32_t targetSlot = this->GetSlotNumFromRpsRawSlot(rps, rawGroup, slot);
+	//uint32_t targetSlot = this->GetSlotNumFromRpsRawSlot(rps, rawGroup, slot);
 	Time slotDuration =
 			MicroSeconds(
 					m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(
@@ -2065,28 +2049,33 @@ void ApWifiMac::OnRAWSlotStart(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 	bool csb =
 			m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(rawGroup - 1).GetSlotCrossBoundary()
 			== 0x01;
-	std::cout << "OnRawStart Access allowed to targetSlot=" << targetSlot << ", duration=" << slotDuration.GetMicroSeconds() << " us, csb=" << csb << std::endl;
-	//NS_LOG_UNCOND ("aid start allowed = " << GetCritAidFromSlotNum(targetSlot,*m_rpsset.rpsset.at(0)));
-	//std::cout << "rps=" << (int)rps-1 << ", rawGroup=" << (int)rawGroup-1 << ", slot=" << (int)slot-1 << std::endl;
-	if (m_qosSupported) {
-		NotifyEdcaOfCsb(Simulator::Now(), slotDuration, csb);
-		m_rawSlotsEdca[targetSlot].find(AC_VO)->second->AccessAllowedIfRaw(
-				true);
-		m_rawSlotsEdca[targetSlot].find(AC_VI)->second->AccessAllowedIfRaw(
-				true);
-		m_rawSlotsEdca[targetSlot].find(AC_BE)->second->AccessAllowedIfRaw(
-				true);
-		m_rawSlotsEdca[targetSlot].find(AC_BK)->second->AccessAllowedIfRaw(
-				true);
-		m_rawSlotsEdca[targetSlot].find(AC_VO)->second->RawStart();
-		m_rawSlotsEdca[targetSlot].find(AC_VI)->second->RawStart();
-		m_rawSlotsEdca[targetSlot].find(AC_BE)->second->RawStart();
-		m_rawSlotsEdca[targetSlot].find(AC_BK)->second->RawStart();
-		//m_rawSlotsEdca[targetSlot][AC_BE]->RawStart();
-	} else {
-		m_rawSlotsDca[targetSlot]->AccessAllowedIfRaw(true);
-		m_rawSlotsDca[targetSlot]->RawStart(slotDuration,
-				m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(rawGroup - 1).GetSlotCrossBoundary());
+	auto rawass = m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(rawGroup - 1);
+	uint16_t aid = rawass.GetRawGroupAIDStart();
+	auto tupit = std::find_if (m_StartaidEndaidToEdcaIndexes.begin(), m_StartaidEndaidToEdcaIndexes.end(), [&aid](const std::tuple<uint16_t, uint16_t, uint32_t> a){return (std::get<0>(a) <= aid && std::get<1>(a) >= aid);});
+	if (tupit != m_StartaidEndaidToEdcaIndexes.end())
+	{
+		uint32_t edcaIndex = std::get<2>(*tupit);
+		std::cout << "OnRawStart Access allowed to aid=" << aid << ", duration=" << slotDuration.GetMicroSeconds() << " us, csb=" << csb << std::endl;
+		//NS_LOG_UNCOND ("aid start allowed = " << GetCritAidFromSlotNum(targetSlot,*m_rpsset.rpsset.at(0)));
+		//std::cout << "rps=" << (int)rps-1 << ", rawGroup=" << (int)rawGroup-1 << ", slot=" << (int)slot-1 << std::endl;
+		if (m_qosSupported) {
+			NotifyEdcaOfCsb(Simulator::Now(), slotDuration, csb);
+			m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->AccessAllowedIfRaw(true);
+			m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->AccessAllowedIfRaw(true);
+			m_rawSlotsEdca[edcaIndex].find(AC_BE)->second->AccessAllowedIfRaw(true);
+			m_rawSlotsEdca[edcaIndex].find(AC_BK)->second->AccessAllowedIfRaw(true);
+			m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->RawStart();
+			m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->RawStart();
+			m_rawSlotsEdca[edcaIndex].find(AC_BE)->second->RawStart();
+			m_rawSlotsEdca[edcaIndex].find(AC_BK)->second->RawStart();
+			//m_rawSlotsEdca[targetSlot][AC_BE]->RawStart();
+		}
+		else
+		{
+			m_rawSlotsDca[edcaIndex]->AccessAllowedIfRaw(true);
+			m_rawSlotsDca[edcaIndex]->RawStart(slotDuration,
+					m_rpsset.rpsset.at(rps - 1)->GetRawAssigmentObj(rawGroup - 1).GetSlotCrossBoundary());
+		}
 	}
 	//NS_LOG_UNCOND("AP RAW SLOT START FOR RAW GROUP " << std::to_string(rawGroup) << " SLOT " << std::to_string(slot));
 }
@@ -2376,9 +2365,51 @@ void ApWifiMac::DeaggregateAmsduAndForward(Ptr<Packet> aggregatedPacket,
 void
 ApWifiMac::UpdateQueues (RPS newRps)
 {
-	// just assgn the old edca object to the new one (it's a pointer anyway?), rearrange the queue and add new elements if needed or delete some
-	// for each non-empty old slot find corresponding new slot and enqueue the packets there
-	// m_rps is still the old one
+	bool change (false);
+	std::vector<std::pair<uint16_t,uint16_t> > differentRawGroups;
+	for (uint32_t j = 0; j < newRps.GetNumberOfRawGroups(); j++)
+	{
+		RPS::RawAssignment ass = newRps.GetRawAssigmentObj(j);
+		std::pair<uint16_t, uint16_t> rawGroup = {ass.GetRawGroupAIDStart(), ass.GetRawGroupAIDEnd()};
+		if (std::find(differentRawGroups.begin(), differentRawGroups.end(), rawGroup) == differentRawGroups.end())
+		{
+			//this RAW group is not mapped yet
+			//check if this RAW group overleaps with some other RAW group
+			bool overlaps = false;
+			std::vector<std::pair<uint16_t,uint16_t> >::iterator dgit;
+			for (dgit = differentRawGroups.begin(); dgit != differentRawGroups.end(); dgit ++)
+			{
+				if ((rawGroup.first <= dgit->first && rawGroup.second  > dgit->second) || (rawGroup.first < dgit->first && rawGroup.second  >= dgit->second))
+				{
+					overlaps = true;
+					//change= true;
+					dgit->first = rawGroup.first;
+					dgit->second = rawGroup.second;
+					break;
+				}
+			}
+			if (!overlaps)
+			{
+				differentRawGroups.push_back(rawGroup);
+				change= true;
+			}
+		}
+	}
+
+	std::vector<std::pair<uint16_t,uint16_t> >::iterator it;
+	for (it = differentRawGroups.begin(); it != differentRawGroups.end(); ++it)
+	{
+		auto mapit = std::find_if (m_StartaidEndaidToEdcaIndexes.begin(), m_StartaidEndaidToEdcaIndexes.end(), [&it](const std::tuple<uint16_t, uint16_t, uint32_t> a){return std::get<0>(a) == it->first && std::get<1>(a) == it->second;});
+		if (mapit == m_StartaidEndaidToEdcaIndexes.end())
+		{
+			uint32_t i = m_StartaidEndaidToEdcaIndexes.size();
+			m_StartaidEndaidToEdcaIndexes.push_back(std::tuple<uint16_t, uint16_t, uint32_t>(it->first, it->second, i));
+		}
+	}
+
+	//TODO iterate through m_StartaidEndaidToEdcaIndexes and delete all RAWs that are there but not in differentRawGroups, if there are no pending packets there
+
+/*
 
 	auto newTotalNumSlots = newRps.GetTotalNumSlots();
 
@@ -2401,7 +2432,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 			}
 		}
 	}
-
+*/
 	if (!change && m_enqueuedToAids.size() == 0)
 	{
 		return;
@@ -2410,7 +2441,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 
 	// we need more/less edca queues because new RPS has more/less slots
 	//if we need more, add them and initialize them
-	for (uint32_t i = this->m_rpsset.rpsset.at(0)->GetTotalNumSlots(); i < newTotalNumSlots; i++)
+	for (uint32_t i = m_rawSlotsEdca.size(); i < m_StartaidEndaidToEdcaIndexes.size(); i++)
 	{
 		Ptr<DcaTxop> dca = CreateObject<DcaTxop>();
 		dca->SetLow(m_low);
@@ -2438,7 +2469,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 		m_rawSlotsEdca.push_back(edca);
 		//new_rawSlotsEdca.push_back(edca);
 	}
-	for (int i = 0; i < newTotalNumSlots; i++)
+	for (int i = 0; i < m_rawSlotsEdca.size(); i++)
 	{
 		m_rawSlotsDca[i]->AccessAllowedIfRaw(false);
 		m_rawSlotsEdca[i].find(AC_VO)->second->AccessAllowedIfRaw(false);
@@ -2447,7 +2478,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 		m_rawSlotsEdca[i].find(AC_BK)->second->AccessAllowedIfRaw(false);
 	}
     //return;
-	std::vector<uint16_t> pagedCpy (m_enqueuedToAids);
+	/*std::vector<uint16_t> pagedCpy (m_enqueuedToAids);
 	std::sort(pagedCpy.begin(), pagedCpy.end());
 	std::vector<uint16_t>::iterator unique_it;
 	unique_it = std::unique(pagedCpy.begin(), pagedCpy.end());
@@ -2672,7 +2703,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 
 					if (peekedPackets_BE.size() != 0)
 					{
-						if ((m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->GetSize() > 0 /*|| m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetCurrentPacket() != 0*/) && tempStoragePackets.find(aid_oldSlot)->second.size() == 0)
+						if ((m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->GetSize() > 0) && tempStoragePackets.find(aid_oldSlot)->second.size() == 0)
 						{
 							//destination queue not empty, we need to move its packets to its destination queue (first in tempstoage for its AID)
 							//dst queue is not empty also in case I already moved some packets from aid's prev slots in prev iteration to dst queue
@@ -2690,12 +2721,6 @@ ApWifiMac::UpdateQueues (RPS newRps)
 								tempStorageAcIndices[aid_oldSlot].push_back(AC_BE);
 								m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetEdcaQueue()->Remove(newPkt);
 							}
-							/*if (m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetCurrentPacket() != 0)
-							{
-								tempStoragePackets[aid_oldSlot].insert(tempStoragePackets[aid_oldSlot].begin(), m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->GetCurrentPacket());
-								tempStorageAcIndices[aid_oldSlot].push_back(AC_BE);
-								m_rawSlotsEdca[new_allTargetSlots[0]].find(AC_BE)->second->ResetCurrentPacket();
-							}*/
 						}
 						for (auto ptrPkt : peekedPackets_BE)
 						{
@@ -2866,10 +2891,10 @@ ApWifiMac::UpdateQueues (RPS newRps)
 			}
 		}
 	}
-
+*/
 
 	//I have rearranged the queues, now I can delete the ones too many
-	for (uint32_t i = newTotalNumSlots; i < this->m_rpsset.rpsset.at(0)->GetTotalNumSlots(); i++)
+	/*for (uint32_t i = newTotalNumSlots; i < this->m_rpsset.rpsset.at(0)->GetTotalNumSlots(); i++)
 	{
 		m_rawSlotsDca[i]->RemoveManager(this->m_dcfManager);
 		m_rawSlotsDca[i]->Dispose();
@@ -2887,7 +2912,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 		m_rawSlotsEdca.resize(newTotalNumSlots);
 	}
 	//assign current packets from tempCurrentPackets
-	AssignCurrentPacketsToQueues (tempCurrentPackets, newRps);
+	AssignCurrentPacketsToQueues (tempCurrentPackets, newRps);*/
 }
 
 void
@@ -3031,17 +3056,27 @@ void ApWifiMac::DoInitialize(void) {
 	else
 		numTim = m_pageslice.GetPageSliceCount();
 
-	uint32_t totalSlots = 0;
-	for (uint32_t i = 0; i < numTim; i++) {
-		for (uint32_t j = 0; j < m_rpsset.rpsset.at(i)->GetNumberOfRawGroups();
-				j++) {
-			RPS::RawAssignment ass = m_rpsset.rpsset.at(i)->GetRawAssigmentObj(
-					j);
-			totalSlots += ass.GetSlotNum();
+	std::vector<std::pair<uint16_t,uint16_t> > differentRawGroups;
+	for (uint32_t i = 0; i < numTim; i++)
+	{
+		for (uint32_t j = 0; j < m_rpsset.rpsset.at(i)->GetNumberOfRawGroups(); j++)
+		{
+			RPS::RawAssignment ass = m_rpsset.rpsset.at(i)->GetRawAssigmentObj(j);
+			std::pair<uint16_t, uint16_t> rawGroup = {ass.GetRawGroupAIDStart(), ass.GetRawGroupAIDEnd()};
+			if (std::find(differentRawGroups.begin(), differentRawGroups.end(), rawGroup) == differentRawGroups.end())
+			{
+				//this RAW group is not mapped yet
+				differentRawGroups.push_back(rawGroup);
+			}
 		}
 	}
-
-	InitializeQueues (totalSlots);
+	InitializeQueues (differentRawGroups.size());
+	std::vector<std::pair<uint16_t,uint16_t> >::iterator it;
+	uint32_t counter (0);
+	for (it = differentRawGroups.begin(); it != differentRawGroups.end(); ++it)
+	{
+		m_StartaidEndaidToEdcaIndexes.push_back(std::tuple<uint16_t, uint16_t, uint32_t>(it->first, it->second, counter++));
+	}
 	staIsActiveDuringCurrentCycle = std::vector<bool>(m_totalStaNum, false);
 	RegularWifiMac::DoInitialize();
 }
