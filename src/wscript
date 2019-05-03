@@ -65,6 +65,11 @@ def configure(conf):
     blddir = os.path.abspath(os.path.join(conf.bldnode.abspath(), conf.variant))
     conf.env.append_value('NS3_MODULE_PATH', blddir)
 
+    #Link libgurobi
+    conf.env.append_value ('SHLIB_MARKER', '-Wl,--no-as-needed,-lglpk,-lm,-lgurobi_c++,-lgurobi81')
+    conf.env['gurobi'] = conf.check(mandatory = True, lib = 'gurobi_c++', uselib_store='gurobi')
+    have_gurobi = conf.check_nonfatal(header_name='gurobi_c++.h', define_name = 'HAVE_GUROBI', use='gurobi')
+    
     for module in all_modules:
         conf.recurse(module, mandatory=False)
 
