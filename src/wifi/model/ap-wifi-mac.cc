@@ -19,7 +19,6 @@
  * Authors: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  *          Mirko Banchi <mk.banchi@gmail.com>
  */
-
 #include "ap-wifi-mac.h"
 #include "ns3/assert.h"
 #include "ns3/log.h"
@@ -1412,7 +1411,6 @@ void delete_pointed_to (T* const ptr)
 void ApWifiMac::SendOneBeacon(void) {
 	NS_LOG_FUNCTION(this);
 	WifiMacHeader hdr;
-
 	m_lastBeaconTime = Simulator::Now();
 
 	if (m_s1gSupported) {
@@ -2055,7 +2053,7 @@ void ApWifiMac::OnRAWSlotStart(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 	if (tupit != m_StartaidEndaidToEdcaIndexes.end())
 	{
 		uint32_t edcaIndex = std::get<2>(*tupit);
-		std::cout << "OnRawStart Access allowed to aid=" << aid << ", duration=" << slotDuration.GetMicroSeconds() << " us, csb=" << csb << std::endl;
+		NS_LOG_DEBUG("OnRawStart Access allowed to aid=" << aid << ", duration=" << slotDuration.GetMicroSeconds() << " us, csb=" << csb);
 		//NS_LOG_UNCOND ("aid start allowed = " << GetCritAidFromSlotNum(targetSlot,*m_rpsset.rpsset.at(0)));
 		//std::cout << "rps=" << (int)rps-1 << ", rawGroup=" << (int)rawGroup-1 << ", slot=" << (int)slot-1 << std::endl;
 		if (m_qosSupported) {
@@ -2437,7 +2435,7 @@ ApWifiMac::UpdateQueues (RPS newRps)
 	{
 		return;
 	}
-	NS_LOG_UNCOND ("****************************CHANGE QUEUES**************************");
+	NS_LOG_DEBUG ("****************************CHANGE QUEUES**************************");
 
 	// we need more/less edca queues because new RPS has more/less slots
 	//if we need more, add them and initialize them

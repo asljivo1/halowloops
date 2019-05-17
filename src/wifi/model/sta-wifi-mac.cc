@@ -1768,11 +1768,11 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
     		{
     			sleept = m_statSlotStart[i];
     			Simulator::Schedule(sleept, &StaWifiMac::WakeUp, this); //own slot
-        		NS_LOG_UNCOND ("aid=" << m_aids[0] << ": after " <<  sleept << " sheduled wakeup.");
+        		NS_LOG_DEBUG ("aid=" << m_aids[0] << ": after " <<  sleept << " sheduled wakeup.");
 
     		}
     		//std::cout << "+++++++++++PAGEDDD SLEEP FOR " << sleept.GetMicroSeconds() << "us and then wake up" << timeBeacon << std::endl;
-    		NS_LOG_UNCOND ("aid=" << m_aids[0] << ": At the end of the slot after " << sleept + this->m_currentslotDuration[i] << " go to sleep." );
+    		NS_LOG_DEBUG ("aid=" << m_aids[0] << ": At the end of the slot after " << sleept + this->m_currentslotDuration[i] << " go to sleep." );
     		//schedule sleep at the end of each slot
     		Simulator::Schedule(sleept + this->m_currentslotDuration[i], &StaWifiMac::GoToSleepBinary, this, 0); //own slot
 

@@ -55,7 +55,7 @@
 #include <climits>
 #include <iterator>
 #include <map>
-
+//#include <sstream>
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("S1gRawCtr");
@@ -154,7 +154,7 @@ Slot::SetSlotStartTime (Time start)
 	m_slotStartTime = start;
 }
 
-SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0), m_oldRawStart (INT_MAX), m_newRawStart (INT_MAX), m_tSent (Time ()), m_tSentPrev (Time ()), m_tInterval (Time ()), m_tIntervalMin (Time ()), m_tIntervalMax (Time ()), m_tEnqMin (Time ())
+SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0), m_oldRawStart (INT_MAX), m_newRawStart (INT_MAX), m_tSent (Time ()), m_tSentPrev (Time ()), m_tInterval (Time ()), m_tIntervalMin (Time ()), m_tIntervalMax (Time ()), m_tEnqMin (Time ()), m_outstandingUplinkPackets (0), m_scheduledUplinkPackets (0)
 {
 
 }
@@ -411,7 +411,7 @@ S1gRawCtr::UpdateSensorStaInfo (std::vector<uint16_t> sensorList, std::vector<ui
 			}
 		}
 	}
-	NS_LOG_UNCOND ("receivedFromAids.size () = " << receivedFromAids.size () << ", m_sensorStations.size() = " << m_sensorStations.size() << ", currentBeacon = " << currentId);
+	NS_LOG_DEBUG ("receivedFromAids.size () = " << receivedFromAids.size () << ", m_sensorStations.size() = " << m_sensorStations.size() << ", currentBeacon = " << currentId);
 
 }
 
@@ -535,8 +535,30 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 			}
 		}
 	}
-	NS_LOG_UNCOND ("receivedFromAids.size () = " << receivedFromAids.size () << ", m_criticalStations.size() = " << m_criticalStations.size() << ", m_aidListPaged.size = " << this->m_aidListPaged.size() << ", currentBeacon = " << currentId);
-	NS_LOG_UNCOND ("enqueuedToAids = " << enqueuedToAids.size());
+
+	for (auto sta : m_criticalStations)
+	{
+		int numOutstandingUl (0);
+		while (sta->m_tInterval != Time() && sta->m_tSent + (numOutstandingUl + 1) * sta->m_tInterval <= Simulator::Now())
+		{
+			numOutstandingUl++;
+		}
+		sta->m_outstandingUplinkPackets = numOutstandingUl;
+		int numScheduledUl (0);
+		while (sta->m_tInterval != Time() && sta->m_tSent + (numOutstandingUl + numScheduledUl + 1) * sta->m_tInterval > Simulator::Now() && sta->m_tSent + (numOutstandingUl + numScheduledUl + 1) * sta->m_tInterval < Simulator::Now() + MicroSeconds(m_beaconInterval))
+		{
+			numScheduledUl++;
+		}
+		//numScheduledUl -= numOutstandingUl;
+		sta->m_scheduledUplinkPackets = numScheduledUl;
+		NS_LOG_DEBUG("Sta " << sta->GetAid() << " delivered the last packet to AP at " << sta->m_tSent << ", interval=" << sta->m_tInterval << ", est. num. of outstanding UL pacets is " << sta->m_outstandingUplinkPackets);
+		NS_LOG_DEBUG("Sta " << sta->GetAid() << " should transmit " << numScheduledUl << " packets in the next BI, interval=" << sta->m_tInterval);
+
+
+	}
+
+	NS_LOG_DEBUG ("receivedFromAids.size () = " << receivedFromAids.size () << ", m_criticalStations.size() = " << m_criticalStations.size() << ", m_aidListPaged.size = " << this->m_aidListPaged.size() << ", currentBeacon = " << currentId);
+	NS_LOG_DEBUG ("enqueuedToAids = " << enqueuedToAids.size());
 	/*NS_LOG_UNCOND ("AID LIST:");
 	for (std::vector<uint16_t>::iterator it = m_aidList.begin(); it != m_aidList.end(); it++)
 	{
@@ -554,7 +576,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 void
 S1gRawCtr::UdpateSensorStaInfo (std::vector<uint16_t> m_sensorlist, std::vector<uint16_t> m_receivedAid, std::string outputpath)
 {
-   //initialization
+  //initialization
   //if sorted queue is empty, put all sensor into queue
   std::string ApNode;
   std::ofstream outputfile;
@@ -1316,6 +1338,487 @@ S1gRawCtr::GetRPS ()
   return *m_rps;
 }
 
+bool
+S1gRawCtr::IsInfoAvailableForAllSta()
+{
+	for (CriticalStationsCI ci = this->m_criticalStations.begin(); ci != m_criticalStations.end(); ci++)
+	{
+		SensorActuator * sta = LookupCriticalSta ((*ci)->GetAid());
+		if (sta->m_tInterval == Time ())
+			return false;
+	}
+	return true;
+}
+
+bool
+S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath)
+{
+
+	uint32_t n = criticalList.size();
+	if (!IsInfoAvailableForAllSta())
+		return false;
+
+	/*NS_LOG_UNCOND ("HEREEEE");
+	return false;*/
+
+	// Create an environment
+	GRBEnv env = GRBEnv();
+	env.set("LogFile", "./././rawOpt.log");
+
+	GRBVar Ws[m][n];
+	GRBVar Zs[m][n];
+	GRBVar Cs[m];
+	try {
+	    // Create an empty model
+	    GRBModel model = GRBModel(env);
+
+	    //Constants that will be used in the model
+	    uint32_t MaxChannelTime, BeaconTxTimeMin (2040); //us
+	    MaxChannelTime = BeaconInterval - BeaconTxTimeMin; //us
+
+	    for (int i = 0; i < m; i++)
+	    {
+	    	std::ostringstream vname;
+	    	for (int h = 0; h < n; h++)
+	    	{
+	    		vname.str("");
+	    		vname << "w" << i << "." << h;
+	    		Ws[i][h] = model.addVar (0.0, 1.0, 0.0, GRB_BINARY, vname.str());
+	    		//Ws[h + i*m] = model.addVar(0.0, 1.0, 0.0, GRB_BINARY, vname.str());
+	    		vname.str("");
+	    		vname << "z" << i << "." << h;
+	    		Zs[i][h] = model.addVar (0.0, MaxChannelTime, 0.0, GRB_CONTINUOUS, vname.str());
+	    		//Zs[h + i*m] = model.addVar(0.0, MaxChannelTime, 0.0, GRB_CONTINUOUS, vname.str());
+	    	}
+	    	vname.str("");
+	    	vname << "c" << i;
+	    	Cs[i] = model.addVar (0.0, MaxChannelTime, 0.0,  GRB_CONTINUOUS, vname.str());
+	    }
+
+	    // Set objective
+	    GRBLinExpr effNumRaws = 0;
+	    GRBLinExpr obj = 0;
+	    for (int i = 0; i < m; i++)
+	    	for (int h = 0; h < n; h++)
+	    	{
+	    		obj += Zs[i][h];
+	    		effNumRaws += Ws[i][h];
+	    	}
+	    model.setObjective(obj, GRB_MINIMIZE);
+
+	    // Add constraint sum_h w_{ih} <= 1 \forall i
+	    for (int i=0; i < m; i++)
+	    {
+	    	std::ostringstream vname;
+	    	vname << "CON_1or0stasInASlot_w_" << i;
+	    	GRBLinExpr allStasInSlotI = 0;
+	    	for (int h=0; h < n; h++)
+	    		allStasInSlotI += Ws[i][h];
+
+	    	model.addConstr(allStasInSlotI <= 1, vname.str());
+	    }
+
+	    // Add constraint sum_i w_{ih} >= 1 \forall h
+	    for (int h=0; h < n; h++)
+	    {
+	    	std::ostringstream vname;
+	    	vname << "CON_geq1SlotPerSta_w_" << h;
+	    	GRBLinExpr slotsPerSta = 0;
+	    	for (int i=0; i < m; i++)
+	    		slotsPerSta += Ws[i][h];
+	    	model.addConstr(slotsPerSta >= 1, vname.str());
+	    }
+
+	    // Add constraint T_{CH} >= c_i
+	    uint32_t pagedSubblocks (0), pageBitmapLen(0);
+	    // Assumption: only 1 TIM - this will not work for multiple TIMs. Paged subblocks then must be counted separately for each TIM
+	    auto allToPage = m_aidListPaged;
+	    allToPage.insert(allToPage.end(), m_aidForcePage.begin(), m_aidForcePage.end());
+	    if (allToPage.size())
+	    {
+	    	std::sort(allToPage.begin(), allToPage.end());
+	    	pagedSubblocks = std::unique(allToPage.begin(), allToPage.end(), [](const uint16_t a, const uint16_t b){return ((a >> 3) & 0x07) == ((b >> 3) & 0x07); }) - allToPage.begin();
+	    	pageBitmapLen =1; //TODO this can be 0,1,2,3,4 and should be read from the new page slice that will be constructed in this beacon
+	    }
+	    uint32_t numTimPaged (allToPage.size() > 0 ? 1 : 0);
+	    GRBLinExpr effBeaconTxTime = 40 + 240 + 40 * ((14 + 8 * (65 + pageBitmapLen + numTimPaged * (63 + pagedSubblocks) + effNumRaws)) / 12); //us
+	    GRBLinExpr effChanelTime = BeaconInterval - effBeaconTxTime;//T_CH us
+	    /*for (int i=0; i < m; i++)
+	    {
+	    	std::ostringstream vname;
+	    	vname << "CON_CiLeqChannelTime" << i;
+	    	model.addConstr(effChanelTime >= Cs[i], vname.str());
+	    	vname.str("");
+	    	vname << "CON_CiGeq0" << i;
+	    	model.addConstr(Cs[i] >= 0, vname.str());
+	    }*/
+
+	    //Add 4 constrains on z_{ih} \forall i,h
+	    GRBLinExpr sumSumZs (0);
+	    for (int i = 0; i < m; i++)
+	    	for (int h = 0; h < n; h++)
+	    	{
+	    		std::ostringstream vname;
+	    		vname << "CON_z1_" << i << "." << h;
+	    		model.addQConstr(0 <= effChanelTime * Ws[i][h] - Zs[i][h], vname.str());
+	    		vname.str("");
+	    		vname << "CON_z2_" << i << "." << h;
+	    		model.addConstr(Zs[i][h] -  Cs[i] <= 0, vname.str());
+	    		vname.str("");
+	    		vname << "CON_z3_" << i << "." << h;
+	    		model.addQConstr(0 >= Cs[i] + effChanelTime * (Ws[i][h] - 1) - Zs[i][h], vname.str());
+	    		vname.str("");
+	    		vname << "CON_z4_" << i << "." << h;
+	    		model.addConstr(Zs[i][h] >= 0, vname.str());
+
+	    		sumSumZs += Zs[i][h];
+	    	}
+
+	    // Add constrains on how to assign stas to slots: paged&outstanding, paged\outstanding, outstading\paged, rest
+	    std::map<uint16_t, bool> pagedAids, outsdandingAids;
+	    std::sort(criticalList.begin(), criticalList.end());
+	    uint16_t yIntersectionP (0), yUnionP (0), yDiffP(0), pDiffY(0);
+	    uint32_t scheduledUlTotal (0);
+	    for (int h=0; h < criticalList.size(); h++)
+	    {
+	    	uint16_t aid = criticalList[h];
+	    	SensorActuator * sta = LookupCriticalSta (aid);
+	    	scheduledUlTotal += sta->m_scheduledUplinkPackets;
+	    	if (sta->m_paged)
+	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
+	    	else
+	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 0));
+
+	    	bool outstandingUl = sta->m_tSent + sta->m_tInterval <= Simulator::Now();
+	    	if (outstandingUl)
+	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 1));
+	    	else
+	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 0));
+
+	    	if (sta->m_paged && outstandingUl)
+	    		yIntersectionP++;
+	    	if (sta->m_paged && !outstandingUl)
+	    		pDiffY++;
+	    	if (!sta->m_paged && outstandingUl)
+	    		yDiffP++;
+	    	if (sta->m_paged || outstandingUl)
+	    		yUnionP++;
+	    }
+	    GRBLinExpr term = 0;
+	    uint64_t txTime = 1240; //us for MCS8 on 2MHz and 64bytes payload
+	    for (int i=0; i < yIntersectionP; i++)
+	    {
+	    	GRBLinExpr sum_n_zih (0), sum_n_pyDuration (0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		term += Ws[i][h] * pagedAids.find (h)->second * outsdandingAids.find (h)->second;
+	    		sum_n_zih += Zs[i][h];
+	    		uint16_t aid = criticalList[h];
+	    		SensorActuator * sta = LookupCriticalSta (aid);
+	    		sum_n_pyDuration += Ws[i][h] * (sta->m_pendingDownlinkPackets + sta->m_outstandingUplinkPackets) * txTime;
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_1stDurationRaw" << i;
+	    	model.addConstr (sum_n_zih >= sum_n_pyDuration, vname.str());
+	    }
+	    model.addConstr(term == yIntersectionP, "CON_1stPaged&Outsdanding");
+
+	    term = 0;
+	    for (int i=yIntersectionP; i < yIntersectionP + pDiffY; i++)
+	    {
+	    	GRBLinExpr sum_n_zih (0), sum_n_pyDuration (0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		term += Ws[i][h] * pagedAids.find (h)->second * (1 - outsdandingAids.find (h)->second);
+
+	    		sum_n_zih += Zs[i][h];
+	    		uint16_t aid = criticalList[h];
+	    		SensorActuator * sta = LookupCriticalSta (aid);
+	    		sum_n_pyDuration += Ws[i][h] * sta->m_pendingDownlinkPackets * txTime;
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_2ndDurationRaw" << i;
+	    	model.addConstr (sum_n_zih >= sum_n_pyDuration, vname.str());
+	    }
+	    model.addConstr(term == pDiffY, "CON_2ndPaged&NotOutsdanding");
+
+	    term = 0;
+	    for (int i=yIntersectionP + pDiffY; i < yUnionP; i++)
+	    {
+	    	GRBLinExpr sum_n_zih (0), sum_n_pyDuration (0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		term += Ws[i][h] * (1 - pagedAids.find (h)->second) * outsdandingAids.find (h)->second;
+
+	    		sum_n_zih += Zs[i][h];
+	    		uint16_t aid = criticalList[h];
+	    		SensorActuator * sta = LookupCriticalSta (aid);
+	    		sum_n_pyDuration += Ws[i][h] * sta->m_outstandingUplinkPackets * txTime;
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_3rdDurationRaw" << i;
+	    	model.addConstr (sum_n_zih >= sum_n_pyDuration, vname.str());
+	    }
+	    model.addConstr(term == yDiffP, "CON_3rdNotPaged&Outsdanding");
+
+	    //term = 0;
+	    for (int i=yUnionP; i < m; i++)
+	    {
+	    	GRBLinExpr sum_n_zih (0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		//term += Ws[i][h] * (1 - pagedAids.find (h)->second) * (1 - outsdandingAids.find (h)->second);
+	    		sum_n_zih += Zs[i][h];
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_4thDurationRaw" << i;
+	    	model.addConstr (sum_n_zih >= 2 * txTime, vname.str());
+	    }
+	    //model.addConstr(term == m - yUnionP, "CON_4thNeitherPagedNorOutsdanding");
+
+	    // Add constrains on number of RAW slots that are not assigned to Paged or Outstanding stations
+	    model.addConstr (effNumRaws - yUnionP <= 2 * scheduledUlTotal, "CON_restRawsNum");
+	    model.addConstr (sumSumZs <= effChanelTime, "CON_totalRawsDurationLessThanEffChannelTime");
+
+	    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	    // Last 3 constrains
+
+	    // Add constraint to describe number of slots to which station h is assigned prior to slot i, excluding Y U P slots.
+	    GRBVar Qs[m][n];
+	    GRBVar Fs[m][n];
+	    GRBVar Ss[m][n];
+
+	    GRBVar Vs[m][n]; //w_{ih} * w_{jh}
+	    GRBVar As[m][n]; //f_{ih} * w_{ih}
+	    //GRBVar Bs[m][n]; //s_{ih} * w_{ih}
+	    for (int i=yUnionP; i < m; i++)
+	    {
+	    	for (int h=0; h<n; h++)
+	    	{
+	    		std::ostringstream vname;
+	    		vname << "q" << i << "." << h;
+	    		Qs[i][h] = model.addVar (0.0, m - yUnionP, 0.0, GRB_INTEGER, vname.str());
+	    		vname.str("");
+	    		vname << "f" << i << "." << h;
+	    		Fs[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    		vname.str("");
+	    		vname << "s" << i << "." << h;
+	    		Ss[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    		vname.str("");
+	    		vname << "v" << i << "." << h;
+	    		Vs[i][h] = model.addVar (0.0, 1.0, 0.0, GRB_BINARY, vname.str());
+	    		vname.str("");
+	    		vname << "a" << i << "." << h;
+	    		As[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    		/*vname.str("");
+	    		vname << "b" << i << "." << h;
+	    		Bs[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());*/
+
+	    		vname.str(""); vname << "CON_v" << i << "." << h << "<=" << "w" << i << "." << h;
+	    		model.addConstr(Vs[i][h] <= Ws[i][h], vname.str());
+
+	    		for (int j=i+1; j < m; j++)
+	    		{
+	    			vname.str(""); vname << "CON_v" << i << "." << h << "<=" << "w" << j << "." << h;
+	    			model.addConstr(Vs[i][h] <= Ws[j][h], vname.str());
+
+	    			vname.str(""); vname << "CON_v" << i << "." << h << ">=" << "w" << i << "." << h << "+w" << j << "." << h << "-1";
+	    			model.addConstr(Vs[i][h] >= Ws[i][h] + Ws[j][h] - 1, vname.str());
+	    		}
+
+	    		GRBLinExpr termSumUptoI (0);
+	    		for (int k=yUnionP; k < i; k++)
+	    		{
+	    			termSumUptoI += Ws[k][h];
+	    		}
+	    		vname.str("");
+	    		vname << "CON_q" << i << "." << h;
+	    		model.addConstr(Qs[i][h] == termSumUptoI, vname.str());
+	    		vname.str("");
+	    		vname << "CON_geq_f" << i << "." << h;
+	    		model.addConstr(Fs[i][h] >= Qs[i][h]/2 - 0.5, vname.str());
+	    		vname.str("");
+	    		vname << "CON_leq_f" << i << "." << h;
+	    		model.addConstr(Fs[i][h] <= Qs[i][h]/2, vname.str());
+
+	    		vname.str("");
+	    		vname << "CON_geq_s" << i << "." << h;
+	    		model.addConstr(Ss[i][h] >= Qs[i][h]/2, vname.str());
+	    		vname.str("");
+	    		vname << "CON_leq_s" << i << "." << h;
+	    		model.addConstr(Ss[i][h] <= Qs[i][h]/2 + 0.5, vname.str());
+	    	}
+	    }
+
+
+	    // Add 2nd constraint
+	    GRBLinExpr sumCkToI (0);
+	    for (int k=0; k <= yUnionP - 1; k++)
+	    	sumCkToI += Cs[k];
+
+	    for (int i=yUnionP; i < m; i++)
+	    {
+	    	GRBLinExpr rhs2 (0), lhs (0), sum1 (0), sum2 (0);;
+	    	sumCkToI += Cs[i];
+
+	    	GRBQuadExpr sumFA(0), sumSA (0), sum4(0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		// 2nd constraint right hand side part
+	    		uint16_t aid = criticalList[h];
+	    		SensorActuator * sta = LookupCriticalSta (aid);
+	    		uint64_t num = (sta->m_tSent.GetMicroSeconds() + sta->m_tInterval.GetMicroSeconds() * sta->m_outstandingUplinkPackets + 2 * sta->m_tInterval.GetMicroSeconds());
+	    		rhs2 += num * Ws[i][h] + sta->m_tInterval.GetMicroSeconds() * As[i][h];
+
+	    		// 1st constraint right hand side part
+	    		sum2 += num * As[i][h];
+	    		num -= sta->m_tInterval.GetMicroSeconds();
+	    		sum1 += num * Ws[i][h];
+	    		sum4 += num * Ss[i][h] * Ws[i][h];
+	    		sumFA += sta->m_tInterval.GetMicroSeconds() * Fs[i][h] * As[i][h];
+	    		sumSA += sta->m_tInterval.GetMicroSeconds() * Ss[i][h] * As[i][h];
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_2ndBig" << i;
+	    	model.addConstr(Simulator::Now().GetMicroSeconds() + sumCkToI <= rhs2, vname.str());
+
+	    	vname.str("");
+	    	vname << "CON_1stBig" << i;
+	    	model.addQConstr(Simulator::Now().GetMicroSeconds() + sumCkToI - txTime >= sum1 + sum2 + sumFA - sum4 - sumSA, vname.str());
+	    }
+
+	    // Add last constraint
+	    GRBVar Os[m][m][n]; //v_{ih} * c_{k}
+	    for (int h=0; h<n; h++)
+	    {
+	    	for (int i=yUnionP; i<m-1; i++)
+	    	{
+	    		for (int k=yUnionP; k<=i; k++)
+	    		{
+	    			std::ostringstream vname;
+	    			vname << "o" << k << "." << i << "." << h;
+	    			Os[k][i][h] = model.addVar (0.0, MaxChannelTime, 0.0, GRB_CONTINUOUS, vname.str());
+
+	    			vname.str("");
+	    			vname << "CON_Okih<=TchVih" << k << "." << i << "." << h;
+	    			model.addQConstr(Os[k][i][h] <= effChanelTime * Vs[i][h], vname.str());
+
+	    			vname.str("");
+	    			vname << "CON_Okih<Ck" << k << "." << i << "." << h;
+	    			model.addConstr(Os[k][i][h] <= Cs[k], vname.str());
+
+	    			vname.str("");
+	    			vname << "CON_Okih>=Ck+Tch(vih-1)" << k << "." << i << "." << h;
+	    			model.addQConstr(Os[k][i][h] >= Cs[k] + effChanelTime * (Vs[i][h] - 1), vname.str());
+
+	    			vname.str("");
+	    			vname << "CON_Okih>=0" << k << "." << i << "." << h;
+	    			model.addConstr(Os[k][i][h] >= 0, vname.str());
+	    		}
+	    	}
+	    }
+
+	    GRBVar Us[m][m][n]; //k.j.h
+	    for (int h=0; h<n; h++)
+	    {
+	    	for (int i=yUnionP; i<m-1; i++)
+	    	{
+	    		for (int j=i+1; j<m; j++)
+	    		{
+	    			for (int k=yUnionP; k<j; k++)
+	    			{
+	    				std::ostringstream vname;
+	    				vname << "u" << k << "." << j << "." << h;
+	    				Us[k][j][h] = model.addVar (0.0, MaxChannelTime, 0.0, GRB_CONTINUOUS, vname.str());
+
+	    				vname.str("");
+	    				vname << "CON_Ukih<=TchWjh" << k << "." << j << "." << h;
+	    				model.addQConstr(Us[k][j][h] <= effChanelTime * Ws[j][h], vname.str());
+
+	    				vname.str("");
+	    				vname << "CON_Ukih<Ck" << k << "." << j << "." << h;
+	    				model.addConstr(Us[k][j][h] <= Cs[k], vname.str());
+
+	    				vname.str("");
+	    				vname << "CON_Ukih>=Ck+Tch(vih-1)" << k << "." << j << "." << h;
+	    				model.addQConstr(Us[k][j][h] >= Cs[k] + effChanelTime * (Ws[j][h] - 1), vname.str());
+
+	    				vname.str("");
+	    				vname << "CON_Ukih>=0" << k << "." << j << "." << h;
+	    				model.addConstr(Us[k][j][h] >= 0, vname.str());
+
+	    			}
+	    		}
+	    	}
+	    }
+	    uint64_t tProcUs = tProcessing.GetMicroSeconds();
+	    GRBQuadExpr firstThree (0), secondThree(0), rightSide2(0), sumSO (0), sumFO(0);
+	    GRBLinExpr sumO (0);
+	    for (int h=0; h<n; h++)
+	    {
+	    	for (int i=yUnionP; i<m-1; i++)
+	    	{
+	    		firstThree += tProcUs * (Vs[i][h] - Ss[i][h] * Vs[i][h] + Fs[i][h] * Vs[i][h]);
+	    		for (int k = yUnionP; k <= i; k++)
+	    		{
+	    			sumO += Os[k][i][h];
+	    			sumSO += Os[k][i][h] * Ss[i][h];
+	    			sumFO += Os[k][i][h] * Fs[i][h];
+	    		}
+	    		for (int j = i+1; j < m; j++)
+	    		{
+	    			for (int k = yUnionP; k < j; k++)
+	    			{
+	    				rightSide2 += Ss[i][h] * Us[k][j][h] - Fs[i][h] * Us[k][j][h];
+	    			}
+	    			std::ostringstream vname;
+	    			vname << "CON_JIH3rdFinal" << j << "." << i << "." << h;
+	    			model.addQConstr(firstThree + secondThree <= rightSide2, vname.str());
+	    		}
+	    	}
+	    }
+
+	    // Save problem
+	    model.write("OptRaw_c++.mps");
+	    model.write("OptRaw_c++.lp");
+
+	    // Optimize model
+	    model.optimize();
+
+	    /*std::cout << x.get(GRB_StringAttr_VarName) << " "
+	         << x.get(GRB_DoubleAttr_X) << std::endl;
+	    std::cout << y.get(GRB_StringAttr_VarName) << " "
+	         << y.get(GRB_DoubleAttr_X) << std::endl;
+	    std::cout << z.get(GRB_StringAttr_VarName) << " "
+	         << z.get(GRB_DoubleAttr_X) << std::endl;
+
+	    std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;*/
+
+	    // Status checking
+	    int status = model.get(GRB_IntAttr_Status);
+
+	    if (status == GRB_INF_OR_UNBD ||
+	    		status == GRB_INFEASIBLE  ||
+	    		status == GRB_UNBOUNDED     ) {
+	    	std::cout << "The model cannot be solved " <<
+	    			"because it is infeasible or unbounded" << std::endl;
+	    	return 1;
+	    }
+	    if (status != GRB_OPTIMAL) {
+	    	std::cout << "Optimization was stopped with status " << status << std::endl;
+	    	return 1;
+	    }
+
+	    // Print result
+	    double objval = model.get(GRB_DoubleAttr_ObjVal);
+	  } catch(GRBException e) {
+		  std::cout << "Error code = " << e.getErrorCode() << std::endl;
+		  std::cout << e.getMessage() << std::endl;
+	  } catch(...) {
+		  std::cout << "Exception during optimization" << std::endl;
+	  }
+}
+
 // Beacon duration), before that use NGroup=1 and initialize by ap-wifi-mac
 RPS
 S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath)
@@ -1326,13 +1829,11 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      //m_prevRps = prevRps;
      if (m_prevRps == nullptr && criticalList.size())
      {
-
     	 //initial
     	 uint32_t count = (m_beaconInterval / 10 - 500) / 120;
     	 uint32_t duration = 500 + count * 120;
 
     	 //assign RAW slots to critical STAs
-
     	 //Assumption: All critical stations have aids 1, 2, ..., N whereas sensors have aids from N+1 onwards
     	 if (criticalList.size())
     	 {
@@ -1419,7 +1920,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     				 //uint32_t numslots;
     				 m_raw->SetSlotNum(1);
     				 uint32_t duration = 500 + 120 * count;
-    				 NS_LOG_UNCOND ("bufferTimeToAllowBeaconToBeReceived us = " << bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds());
+    				 NS_LOG_DEBUG ("bufferTimeToAllowBeaconToBeReceived us = " << bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds());
     				 if (duration * criticalList.size() >= m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds())
     				 {
     					 count = 1 + (2 * 1240 - 500) / 120;
@@ -1427,7 +1928,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     					 m_raw->SetSlotDurationCount(count);
     					 if (duration * criticalList.size() >= m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds())
     					 {
-    						 NS_LOG_UNCOND ("CANNOT ASSIGN SEPARATE SLOT TO " << criticalList.size() << " CRITICAL STATIONS!");
+    						 NS_LOG_DEBUG ("CANNOT ASSIGN SEPARATE SLOT TO " << criticalList.size() << " CRITICAL STATIONS!");
     						 //numslots = (m_beaconInterval - bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds()) / (500 + 120 * count);
     						 m_raw->SetSlotNum(1);
     					 }
@@ -1468,59 +1969,25 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      {
     	 UpdateCriticalStaInfo (criticalList, receivedFromAids, enqueuedToAids, receivedTimes, sentTimes, outputpath);
     	 UpdateSensorStaInfo (sensorList, receivedFromAids, receivedTimes, sentTimes);
-    	 //this->UdpateSensorStaInfo(sensorList, receivedFromAids, outputpath);
-
-    	 //not initial, there was a non-empty RPS in the previous beacon but no successful receptions??????
-    	 //2 possibilities:
-    	 //   1) Unlucky RAW configuration: packets were enqueued at STA after RAW so they couldn't be TXed
-    	 //	  2) t_int is longer than beacon interval, unused RAW
-    	 // AP cannot know which case is it at this point
-
-    	 //our strategy is to keep the same RAW grouping but shift in time for beacon_interval/2
-    	 // TODO experiment with this setting in the end!!!!
-    	 /*
-    	 for (CriticalStationsCI ci = this->m_criticalStations.begin(); ci != m_criticalStations.end(); ci++)
-    	 {
-    		 if ((*ci)->m_nTx == 0)// TODO this will execute at the very end of simulation in case I schedule for the next beacon normally
-    		 {//TODO make sure this doesn't worsen the schedule in this case, add && m_tint == 0 or set states or something?
-
-    			 //state P_NRX
-    			 // keep the same RAW configuration but shift it in time for BI/2 for all loops
-    			 // not all loops have been present in m-prevRps, some might just be associated
-    			 SensorActuator * sta = LookupCriticalSta ((*ci)->GetAid());
-    			 if (sta->m_oldRawStart < INT_MAX)
-    				 sta->m_newRawStart = sta->m_oldRawStart + bufferTimeToAllowBeaconToBeReceived.GetMicroSeconds() + m_prevRps->GetRawAssigmentObjFromAid((*ci)->GetAid()).GetSlotDuration() <= m_beaconInterval/2 ? sta->m_oldRawStart + m_beaconInterval/2 : 0;
-    			 else
-    				 sta->m_newRawStart = 0;
-    			 //This m_newRawStart is a wanted value, but it can be the same for multiple loops at this point. Later make sure all loops have their own non-overlapping slots
-    		 }
-    		 else
-    		 {
-    			 //state P_RX
-    		 }
-    	 }
-    	  */
 
     	 delete m_rps;
     	 m_rps = new RPS;
     	 DistributeStationsToRaws ();
 
+    	 Time tProcessing = MilliSeconds (10);
+    	 std::cout << std::endl << std::endl;
+    	 Time startTime = Simulator::Now();
+    	 OptimizeRaw(criticalList, 4, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath);
+    	 NS_LOG_UNCOND ("Start time=" << startTime << "End time=" << Simulator::Now());
     	 // I've populated m_criticalStations, m_aidListPaged, m_aidList;
     	 // I have to determine m_tInterval, m_tEnqMin etc for RAW assignment
 
 
      }
-     /*else if (!m_t_succ.empty() && m_prevRps)
-     {
-    	 //not initial, there was a non-empty RPS in the previous beacon and successful receptions
-    	 // see if some STAs actually didn't have successfull transmissions, in that case is the previous else if but for a STA
-
-     }*/
      currentId++; //beaconInterval counter
 
      ControlRps (criticalList);
-     //std::ofstream coutpom = std::cout;
-     m_rps->Print(std::cout);
+     //m_rps->Print(std::cout);
      /*NS_LOG_UNCOND (" +++ ALL SLOTS +++" );
      	for (auto& s : allSlots)
      	{
@@ -1543,8 +2010,8 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      return *m_rps;
 }
 
-void
-S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
+Time
+S1gRawCtr::GetBeaconTxDuration (std::vector<uint16_t> criticalList)
 {
 	uint32_t beaconSize (27 + 26), pagedSubblocks (0), pageBitmapLen(0);
 
@@ -1567,8 +2034,16 @@ S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
 	beaconSize += rpsSize + timSize + pageSliceSize;
 	//Here we assume data rate is 300000 bps, Nss=1 and symbol duration is 40 us
 	Time beaconTxDuration (MicroSeconds (240 + 40 * std::ceil((8 + 6 + 8 * beaconSize) / 12.)));
-	NS_LOG_UNCOND ("+++++beaconTxDuration = " << beaconTxDuration.GetMicroSeconds() << ", beaconSize=" << beaconSize << ", allToPage.size()=" << allToPage.size() << ", numTimPaged=" << numTimPaged);
+	NS_LOG_DEBUG ("S1gRawCtr::ControlRps -- beaconTxDuration = " << beaconTxDuration.GetMicroSeconds() << ", beaconSize=" << beaconSize << ", allToPage.size()=" << allToPage.size() << ", numTimPaged=" << numTimPaged);
+	return beaconTxDuration;
+}
+
+void
+S1gRawCtr::ControlRps (std::vector<uint16_t> criticalList)
+{
+
 	Time rawlenCritical (Time (0)), rawlenSensors (Time (0));
+	Time beaconTxDuration = GetBeaconTxDuration (criticalList);
 	for (int i = 0; i < this->m_rps->GetNumberOfRawGroups(); i++)
 	{
 			if (std::find (criticalList.begin(), criticalList.end(), m_rps->GetRawAssigmentObj(i).GetRawGroupAIDStart()) != criticalList.end())
@@ -1724,7 +2199,7 @@ S1gRawCtr::DistributeStationsToRaws ()
 		//AASIGN ASAP RAW IS PAGED OR EXTEND EXISTING ONE TAKE INTO ACCOUTN PENDING DLPACKETS
 
 		auto aid = (*ci)->GetAid();
-		NS_LOG_UNCOND ("AID=" << aid << " is critical and has interval=" << sta->m_tInterval << ", m_tSent=" << sta->m_tSent << ", m_tSentPrev=" << sta->m_tSentPrev);
+		NS_LOG_DEBUG ("AID=" << aid << " is critical and has interval=" << sta->m_tInterval << ", m_tSent=" << sta->m_tSent << ", m_tSentPrev=" << sta->m_tSentPrev);
 		if (sta->m_tInterval != Time ())
 		{
 			Time sinceLastReception = sta->m_tSuccessLast;
@@ -1738,7 +2213,7 @@ S1gRawCtr::DistributeStationsToRaws ()
 			else
 			{
 				//the last sta->m_tSent is too old, assign generic RAWs
-				NS_LOG_UNCOND ("The last m_tSent time IS TOO OLD, ASSIGN GENERIC RAWs");
+				NS_LOG_DEBUG ("The last m_tSent time IS TOO OLD, ASSIGN GENERIC RAWs");
 				Slot s;
 				s.SetAid(aid);
 				Time sst = GetSoonestSlotStartTime (criticalSlots, GetUlSlotCount() + 10, aid);
@@ -2043,7 +2518,7 @@ S1gRawCtr::deleteRps ()
 }
 
 void S1gRawCtr::gandalf()
-{
+{/*
     std::cout <<
     	"                           ,---.\n" <<
         "                          /    |\n" <<
@@ -2071,7 +2546,7 @@ void S1gRawCtr::gandalf()
         "          \:: :     /     `     ,   /  |\n" <<
         "           || |    (        ,' /   /   |\n" <<
         "           ||                ,'   /    |" << std::endl;
-}
+*/}
 
 void S1gRawCtr::darth()
 {

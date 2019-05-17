@@ -1237,7 +1237,7 @@ EdcaTxopN::StartAccessIfNeeded (void)
 {
   NS_LOG_FUNCTION (this);
   NS_LOG_DEBUG("++++ EdcaTxopN::StartAccessIfNeeded,m_currentPacket == 0=" << (m_currentPacket == 0) << ",!m_queue->IsEmpty ()=" << !m_queue->IsEmpty () << ",m_baManager->HasPackets ()=" << m_baManager->HasPackets () << ",!m_dcf->IsAccessRequested ()=" << !m_dcf->IsAccessRequested () << ",AccessIfRaw=" << AccessIfRaw );
-  NS_LOG_UNCOND ("retry=" << (int)m_currentHdr.m_ctrlRetry);
+  //NS_LOG_UNCOND ("retry=" << (int)m_currentHdr.m_ctrlRetry);
   if (m_currentPacket == 0
       && (!m_queue->IsEmpty () || m_baManager->HasPackets ())
       && !m_dcf->IsAccessRequested ()

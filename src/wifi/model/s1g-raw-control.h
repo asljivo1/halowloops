@@ -29,6 +29,7 @@
 #include "supported-rates.h"
 #include "ns3/random-variable-stream.h"
 #include "rps.h"
+#include "gurobi_c++.h"
 #include <memory>
 
 namespace ns3 {
@@ -159,7 +160,8 @@ public:
 
 	uint32_t m_pendingDownlinkPackets;
 	bool m_paged;
-
+	uint32_t m_outstandingUplinkPackets;
+	uint32_t m_scheduledUplinkPackets;
 	uint64_t m_nTx;
 	Time m_tSuccessLast;
 	Time m_tSuccessPreLast;
@@ -227,7 +229,8 @@ public:
   virtual ~S1gRawCtr ();
 //this->m_criticalAids, this->m_sensorAids, this->m_offloadAids, this->GetBeaconInterval(), this->m_rpsset.rpsset.back()
     RPS  UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath);
-
+  bool OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath);
+  bool IsInfoAvailableForAllSta ();
   void configureRAW ();
   RPS GetRPS ();
     
@@ -257,6 +260,7 @@ public:
   uint32_t GetDlSlotCount (void) const;
   Time GetUlSlotDuration (void) const;
   uint32_t GetUlSlotCount (void) const;
+  Time GetBeaconTxDuration (std::vector<uint16_t> criticalList);
     typedef std::vector<Sensor *> Stations;
     typedef std::vector<Sensor *>::iterator StationsCI;
     Stations m_stations;
@@ -287,7 +291,6 @@ private:
 	std::unique_ptr<RPS> m_prevPrevRps;
 	RPS * m_rps;
 	uint64_t m_beaconInterval;
-
 
   uint64_t m_rawslotDuration; //us
   uint64_t m_maybeAirtimeSensor;
