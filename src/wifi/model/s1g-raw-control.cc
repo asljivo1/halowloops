@@ -1614,15 +1614,15 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    		vname << "b" << i << "." << h;
 	    		Bs[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());*/
 
-	    		vname.str(""); vname << "CON_v" << i << "." << h << "<=" << "w" << i << "." << h;
-	    		model.addConstr(Vs[i][h] <= Ws[i][h], vname.str());
-
 	    		for (int j=i+1; j < m; j++)
 	    		{
-	    			vname.str(""); vname << "CON_v" << i << "." << h << "<=" << "w" << j << "." << h;
+	    			vname.str(""); vname << "CON_v" << i << "." << j << "." << h << "<=" << "w" << i << "." << h;
+	    			model.addConstr(Vs[i][h] <= Ws[i][h], vname.str());
+
+	    			vname.str(""); vname << "CON_v" << i << "." << j << "." << h << "<=" << "w" << j << "." << h;
 	    			model.addConstr(Vs[i][h] <= Ws[j][h], vname.str());
 
-	    			vname.str(""); vname << "CON_v" << i << "." << h << ">=" << "w" << i << "." << h << "+w" << j << "." << h << "-1";
+	    			vname.str(""); vname << "CON_v" << i << "." << j << "." << h << ">=" << "w" << i << "." << h << "+w" << j << "." << h << "-1";
 	    			model.addConstr(Vs[i][h] >= Ws[i][h] + Ws[j][h] - 1, vname.str());
 	    		}
 
@@ -1704,7 +1704,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    			model.addQConstr(Os[k][i][h] <= effChanelTime * Vs[i][h], vname.str());
 
 	    			vname.str("");
-	    			vname << "CON_Okih<Ck" << k << "." << i << "." << h;
+	    			vname << "CON_Okih<=Ck" << k << "." << i << "." << h;
 	    			model.addConstr(Os[k][i][h] <= Cs[k], vname.str());
 
 	    			vname.str("");
@@ -1736,7 +1736,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    				model.addQConstr(Us[k][j][h] <= effChanelTime * Ws[j][h], vname.str());
 
 	    				vname.str("");
-	    				vname << "CON_Ukih<Ck" << k << "." << j << "." << h;
+	    				vname << "CON_Ukih<=Ck" << k << "." << j << "." << h;
 	    				model.addConstr(Us[k][j][h] <= Cs[k], vname.str());
 
 	    				vname.str("");
@@ -1764,6 +1764,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    			sumO += Os[k][i][h];
 	    			sumSO += Os[k][i][h] * Ss[i][h];
 	    			sumFO += Os[k][i][h] * Fs[i][h];
+	    			secondThree += sumO + sumSO + sumFO;
 	    		}
 	    		for (int j = i+1; j < m; j++)
 	    		{
