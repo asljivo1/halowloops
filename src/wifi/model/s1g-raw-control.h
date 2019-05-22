@@ -242,6 +242,7 @@ public:
   void calculateActiveOffloadSta ();
   void SetOffloadAllowedToSend ();
   void DistributeStationsToRaws ();
+  void EncodeRaws (std::vector<Slot> criticalSlots);
   void ControlRps (std::vector<uint16_t> criticalList);
   void gandalf();
   void darth();
