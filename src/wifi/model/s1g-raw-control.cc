@@ -55,6 +55,7 @@
 #include <climits>
 #include <iterator>
 #include <map>
+#include <iomanip>
 //#include <sstream>
 namespace ns3 {
 
@@ -1364,6 +1365,16 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	GRBVar Ws[m][n];
 	GRBVar Zs[m][n];
 	GRBVar Cs[m];
+	GRBVar svEq[m][m][n]; //s_i.h * v_i.j.h = alpha
+	GRBVar fvEq[m][m][n]; //f_i.h * v_i.j.h = beta
+	GRBVar swEq[m][m][n]; //s_i.h * w_j.h = theta
+	GRBVar fwEq[m][m][n]; //f_i.h * w_j.h = psi
+    GRBVar Qs[m][n];
+    GRBVar Fs[m][n];
+    GRBVar Ss[m][n];
+    GRBVar Vs[m][m][n]; //w_{ih} * w_{jh}
+    GRBVar As[m][n]; //f_{ih} * w_{ih}
+
 	try {
 	    // Create an empty model
 	    GRBModel model = GRBModel(env);
@@ -1371,7 +1382,35 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    //Constants that will be used in the model
 	    uint32_t MaxChannelTime, BeaconTxTimeMin (2040); //us
 	    MaxChannelTime = BeaconInterval - BeaconTxTimeMin; //us
+	    std::sort(criticalList.begin(), criticalList.end());
+	    uint16_t yIntersectionP (0), yUnionP (0), yDiffP(0), pDiffY(0);
+	    uint32_t scheduledUlTotal (0);
+	    std::map<uint16_t, bool> pagedAids, outsdandingAids;
+	    for (int h=0; h < criticalList.size(); h++)
+	    {
+	    	uint16_t aid = criticalList[h];
+	    	SensorActuator * sta = LookupCriticalSta (aid);
+	    	scheduledUlTotal += sta->m_scheduledUplinkPackets;
+	    	if (sta->m_paged)
+	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
+	    	else
+	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 0));
 
+	    	bool outstandingUl = sta->m_tSent + sta->m_tInterval <= Simulator::Now();
+	    	if (outstandingUl)
+	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 1));
+	    	else
+	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 0));
+
+	    	if (sta->m_paged && outstandingUl)
+	    		yIntersectionP++;
+	    	if (sta->m_paged && !outstandingUl)
+	    		pDiffY++;
+	    	if (!sta->m_paged && outstandingUl)
+	    		yDiffP++;
+	    	if (sta->m_paged || outstandingUl)
+	    		yUnionP++;
+	    }
 	    for (int i = 0; i < m; i++)
 	    {
 	    	std::ostringstream vname;
@@ -1380,11 +1419,44 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    		vname.str("");
 	    		vname << "w" << i << "." << h;
 	    		Ws[i][h] = model.addVar (0.0, 1.0, 0.0, GRB_BINARY, vname.str());
-	    		//Ws[h + i*m] = model.addVar(0.0, 1.0, 0.0, GRB_BINARY, vname.str());
 	    		vname.str("");
 	    		vname << "z" << i << "." << h;
 	    		Zs[i][h] = model.addVar (0.0, MaxChannelTime, 0.0, GRB_CONTINUOUS, vname.str());
-	    		//Zs[h + i*m] = model.addVar(0.0, MaxChannelTime, 0.0, GRB_CONTINUOUS, vname.str());
+
+	    		if (i >= yUnionP)
+	    		{
+	    			if (i < m-1)
+	    				for (int j = i+1; j < m; j++)
+	    				{
+	    					vname.str("");
+	    					vname << "svEq" << i << "." << j << "." << h;
+	    					svEq[i][j][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    					vname.str("");
+	    					vname << "fvEq" << i << "." << j << "." << h;
+	    					fvEq[i][j][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    					vname.str("");
+	    					vname << "swEq" << i << "." << j << "." << h;
+	    					swEq[i][j][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    					vname.str("");
+	    					vname << "fwEq" << i << "." << j << "." << h;
+	    					fwEq[i][j][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    					vname.str("");
+	    					vname << "v" << i << "." << j << "." << h;
+	    					Vs[i][j][h] = model.addVar (0.0, 1.0, 0.0, GRB_BINARY, vname.str());
+	    				}
+	    			vname.str("");
+	    			vname << "q" << i << "." << h;
+	    			Qs[i][h] = model.addVar (0.0, m - yUnionP, 0.0, GRB_INTEGER, vname.str());
+	    			vname.str("");
+	    			vname << "f" << i << "." << h;
+	    			Fs[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    			vname.str("");
+	    			vname << "s" << i << "." << h;
+	    			Ss[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    			vname.str("");
+	    			vname << "a" << i << "." << h;
+	    			As[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
+	    		}
 	    	}
 	    	vname.str("");
 	    	vname << "c" << i;
@@ -1471,35 +1543,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    	}
 
 	    // Add constrains on how to assign stas to slots: paged&outstanding, paged\outstanding, outstading\paged, rest
-	    std::map<uint16_t, bool> pagedAids, outsdandingAids;
-	    std::sort(criticalList.begin(), criticalList.end());
-	    uint16_t yIntersectionP (0), yUnionP (0), yDiffP(0), pDiffY(0);
-	    uint32_t scheduledUlTotal (0);
-	    for (int h=0; h < criticalList.size(); h++)
-	    {
-	    	uint16_t aid = criticalList[h];
-	    	SensorActuator * sta = LookupCriticalSta (aid);
-	    	scheduledUlTotal += sta->m_scheduledUplinkPackets;
-	    	if (sta->m_paged)
-	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
-	    	else
-	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 0));
 
-	    	bool outstandingUl = sta->m_tSent + sta->m_tInterval <= Simulator::Now();
-	    	if (outstandingUl)
-	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 1));
-	    	else
-	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 0));
 
-	    	if (sta->m_paged && outstandingUl)
-	    		yIntersectionP++;
-	    	if (sta->m_paged && !outstandingUl)
-	    		pDiffY++;
-	    	if (!sta->m_paged && outstandingUl)
-	    		yDiffP++;
-	    	if (sta->m_paged || outstandingUl)
-	    		yUnionP++;
-	    }
 	    GRBLinExpr term = 0;
 	    uint64_t txTime = 1240; //us for MCS8 on 2MHz and 64bytes payload
 	    for (int i=0; i < yIntersectionP; i++)
@@ -1578,41 +1623,17 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 
 	    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	    // Last 3 constrains
-
-	    // Add constraint to describe number of slots to which station h is assigned prior to slot i, excluding Y U P slots.
-	    GRBVar Qs[m][n];
-	    GRBVar Fs[m][n];
-	    GRBVar Ss[m][n];
-
-	    GRBVar Vs[m][m][n]; //w_{ih} * w_{jh}
-	    GRBVar As[m][n]; //f_{ih} * w_{ih}
 	    //GRBVar Bs[m][n]; //s_{ih} * w_{ih}
 	    for (int i=yUnionP; i < m; i++)
 	    {
 	    	for (int h=0; h<n; h++)
 	    	{
 	    		std::ostringstream vname;
-	    		vname << "q" << i << "." << h;
-	    		Qs[i][h] = model.addVar (0.0, m - yUnionP, 0.0, GRB_INTEGER, vname.str());
-	    		vname.str("");
-	    		vname << "f" << i << "." << h;
-	    		Fs[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
-	    		vname.str("");
-	    		vname << "s" << i << "." << h;
-	    		Ss[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
-	    		vname.str("");
-	    		vname << "a" << i << "." << h;
-	    		As[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
-	    		/*vname.str("");
-	    		vname << "b" << i << "." << h;
-	    		Bs[i][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());*/
+
+
 	    		if (i < m-1)
 	    			for (int j=i+1; j < m; j++)
 	    			{
-	    				vname.str("");
-	    				vname << "v" << i << "." << j << "." << h;
-	    				Vs[i][j][h] = model.addVar (0.0, 1.0, 0.0, GRB_BINARY, vname.str());
-
 	    				vname.str(""); vname << "CON_v" << i << "." << j << "." << h << "<=" << "w" << i << "." << h;
 	    				model.addConstr(Vs[i][j][h] <= Ws[i][h], vname.str());
 
@@ -1772,10 +1793,6 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    	}
 	    }*/
 	    uint64_t tProcUs = tProcessing.GetMicroSeconds();
-	    GRBVar svEq[m][m][n]; //s_i.h * v_i.j.h = alpha
-	    GRBVar fvEq[m][m][n]; //f_i.h * v_i.j.h = beta
-	    GRBVar swEq[m][m][n]; //s_i.h * w_j.h = theta
-	    GRBVar fwEq[m][m][n]; //f_i.h * w_j.h = psi
 	    GRBQuadExpr firstThree (0), secondThree(0), rightSide2(0);
 	    GRBLinExpr sumCkI (0), sumCkJ (0);
 	    for (int h=0; h<n; h++)
@@ -1787,17 +1804,6 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    			firstThree += tProcUs * (Vs[i][j][h] - Ss[i][h] * Vs[i][j][h] + Fs[i][h] * Vs[i][j][h]);
 
 	    			std::ostringstream vname;
-	    			vname << "svEq" << i << "." << j << "." << h;
-	    			svEq[i][j][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
-	    			vname.str("");
-	    			vname << "fvEq" << i << "." << j << "." << h;
-	    			fvEq[i][j][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
-	    			vname.str("");
-	    			vname << "swEq" << i << "." << j << "." << h;
-	    			swEq[i][j][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
-	    			vname.str("");
-	    			vname << "fwEq" << i << "." << j << "." << h;
-	    			fwEq[i][j][h] = model.addVar (0.0, (m - yUnionP)/2, 0.0, GRB_INTEGER, vname.str());
 
 	    			vname.str(""); vname << "svEq=Sih*Vijh" << i << "." << j << "." << h;
 	    			model.addQConstr(svEq[i][j][h] == Ss[i][h] * Vs[i][j][h], vname.str());
@@ -1839,53 +1845,155 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    // Optimize model
 	    model.optimize();
 
-	    /*std::cout << x.get(GRB_StringAttr_VarName) << " "
-	         << x.get(GRB_DoubleAttr_X) << std::endl;
-	    std::cout << y.get(GRB_StringAttr_VarName) << " "
-	         << y.get(GRB_DoubleAttr_X) << std::endl;
-	    std::cout << z.get(GRB_StringAttr_VarName) << " "
-	         << z.get(GRB_DoubleAttr_X) << std::endl;
-
-	    std::cout << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;*/
-
 	    std::ofstream os;
 	    std::string outputpath = "./optimization/";
-	    std::string fname = outputpath + "res_" + std::to_string(currentId + 1) + ".txt";
-	    os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
+	    int num = currentId + 1;
+	    std::string fname = outputpath + "res_" + std::to_string(num) + ".txt";
+	    os.open(fname.c_str(), std::ios::out | std::ios::trunc);
 	    os << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
-	    for (int i = 0; i < m; i++)
+
+
+	    for (int h = 0; h < n; h++)
 	    {
-    		os << Cs[i].get(GRB_StringAttr_VarName) << " " << Cs[i].get(GRB_DoubleAttr_X) << std::endl;
-	    	for (int h = 0; h < n; h++)
+	    	for (int i = 0; i < m; i++)
 	    	{
-	    		os << Ws[i][h].get(GRB_StringAttr_VarName) << " " << Ws[i][h].get(GRB_DoubleAttr_X) << std::endl;
-	    		os << Zs[i][h].get(GRB_StringAttr_VarName) << " " << Zs[i][h].get(GRB_DoubleAttr_X) << std::endl;
+	    		os << std::left << std::setw(6) << Zs[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Zs[i][h].get(GRB_DoubleAttr_X);
+
 	    	}
+	    	os << std::endl;
 	    }
+	    os << std::endl;
+	    /*for (int i = 0; i < m; i++)
+	    	os << std::left << std::setw(3) << Cs[i].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Cs[i].get(GRB_DoubleAttr_X);
+	    os << std::endl;
+	    for (int h = 0; h < n; h++)
+	    {
+	    	for (int i = yUnionP; i < m; i++)
+	    		os << std::left << std::setw(6) << Qs[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Qs[i][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+	    for (int h = 0; h < n; h++)
+	    {
+	    	for (int i = yUnionP; i < m; i++)
+	    		os << std::left << std::setw(6) << Ws[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Ws[i][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+	    for (int h = 0; h < n; h++)
+	    {
+	    	for (int i = yUnionP; i < m; i++)
+	    		os << std::left << std::setw(6) << Fs[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Fs[i][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+	    for (int h = 0; h < n; h++)
+	    {
+	    	for (int i = yUnionP; i < m; i++)
+	    		os << std::left << std::setw(10) << Ss[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Ss[i][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+
+	    for (int h = 0; h < n; h++)
+	    {
+	    	for (int i = 0; i < m-1; i++)
+	    		for (int j = i + 1; j < m; j++)
+	    			os << std::left << std::setw(10) << Vs[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Vs[i][j][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+	    for (int h = 0; h < n; h++)
+	    {
+	    	for (int i = 0; i < m; i++)
+	    		os << std::left << std::setw(10) << As[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << As[i][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+	    for (int h=0; h<n; h++)
+	    {
+	    	for (int i=yUnionP; i<m-1; i++)
+	    		for (int j = i+1; j < m; j++)
+	    			os << std::left << std::setw(10) << svEq[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << svEq[i][j][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+	    for (int h=0; h<n; h++)
+	    {
+	    	for (int i=yUnionP; i<m-1; i++)
+	    		for (int j = i+1; j < m; j++)
+	    			os << std::left << std::setw(10) << fvEq[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << fvEq[i][j][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+	    for (int h=0; h<n; h++)
+	    {
+	    	for (int i=yUnionP; i<m-1; i++)
+	    		for (int j = i+1; j < m; j++)
+	    			os << std::left << std::setw(10) << swEq[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << swEq[i][j][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+	    for (int h=0; h<n; h++)
+	    {
+	    	for (int i=yUnionP; i<m-1; i++)
+	    		for (int j = i+1; j < m; j++)
+	    			os << std::left << std::setw(10) << fwEq[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << fwEq[i][j][h].get(GRB_DoubleAttr_X);
+	    	os << std::endl;
+	    }*/
+
+
 	    os.close();
+
 
 	    // Status checking
 	    int status = model.get(GRB_IntAttr_Status);
 
 	    if (status == GRB_INF_OR_UNBD ||
 	    		status == GRB_INFEASIBLE  ||
-	    		status == GRB_UNBOUNDED     ) {
+	    		status == GRB_UNBOUNDED     )
+	    {
 	    	std::cout << "The model cannot be solved " <<
 	    			"because it is infeasible or unbounded" << std::endl;
-	    	return 1;
+	    	return false;
 	    }
 	    if (status != GRB_OPTIMAL) {
 	    	std::cout << "Optimization was stopped with status " << status << std::endl;
-	    	return 1;
+	    	return false;
 	    }
+	    std::vector<Slot> criticalSlots;
+	    Time acc = Time ();
+	    for (int i = 0; i < m; i++)
+	    {
+	    	Slot s;
+	    	for (int h = 0; h < n; h++)
+	    	{
+	    		uint64_t duration = Zs[i][h].get(GRB_DoubleAttr_X);
+	    		if (duration > 500)
+	    		{
+	    			s.SetAid(h+1);
+	    			s.SetSlotStartTime(acc);
+	    			acc += MicroSeconds (duration);
+	    			uint16_t count = ((uint64_t)duration - 500) / 120;
+	    			if (count < 256)
+	    				s.SetSlotFormat(0);
+	    			else if (count < 2048)
+	    				s.SetSlotFormat(1);
+	    			s.SetSlotCount(count);
+	    		}
 
-	    // Print result
-	    double objval = model.get(GRB_DoubleAttr_ObjVal);
+	    	}
+	    	criticalSlots.push_back(s);
+	    }
+	    EncodeRaws (criticalSlots);
+	    return true;
 	  } catch(GRBException e) {
 		  std::cout << "Error code = " << e.getErrorCode() << std::endl;
 		  std::cout << e.getMessage() << std::endl;
+		  return false;
 	  } catch(...) {
 		  std::cout << "Exception during optimization" << std::endl;
+		  return false;
 	  }
 }
 
@@ -2043,8 +2151,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     	 delete m_rps;
     	 m_rps = new RPS;
 
-    	 DistributeStationsToRaws ();
-    	 /*
+
     	 Time tProcessing = MilliSeconds (10);
 
     	 if (!IsInfoAvailableForAllSta())
@@ -2053,13 +2160,14 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     	 }
     	 else
     	 {
-    		 DistributeStationsToRaws ();
-
+    		 //DistributeStationsToRaws ();
     		 std::cout << std::endl << std::endl;
     		 Time startTime = Simulator::Now();
-    		 OptimizeRaw(criticalList, 6, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath);
+    		 //bool success = OptimizeRaw(criticalList, 4, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath);
+    		 //if (!success)
+    			 DistributeStationsToRaws ();
     		 NS_LOG_UNCOND ("Start time=" << startTime << "End time=" << Simulator::Now());
-    	 }*/
+    	 }
      }
      currentId++; //beaconInterval counter
 
