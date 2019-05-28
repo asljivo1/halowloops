@@ -1801,7 +1801,7 @@ void ApWifiMac::SendOneBeacon(void) {
 
 		uint8_t nRaw;
 		nRaw = p_rps->GetNumberOfRawGroups();
-
+		//p_rps->Print(std::cout);
 		currentRawGroup = (currentRawGroup + 1) % nRaw;
 
 		uint16_t startaid;

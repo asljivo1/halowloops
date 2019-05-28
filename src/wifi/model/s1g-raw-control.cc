@@ -482,10 +482,14 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 		SensorActuator * stationTransmit = LookupCriticalSta (*ci);
 		if (stationTransmit != nullptr && !match)
 		{
+			NS_LOG_UNCOND ("+++++++++aid=" << *ci <<", m_oldRawStart = " << stationTransmit->m_oldRawStart);
 			m_aidList.push_back (*ci);
 			if (m_prevRps && m_prevRps->GetNumAssignedRaws(*ci))
-				stationTransmit->m_oldRawStart = this->m_prevRps->GetRawSlotStartFromAid(*ci);
-			//NS_LOG_UNCOND ("+++++++++aid=" << *ci <<", m_oldRawStart = " << stationTransmit->m_oldRawStart);
+			{
+				//m_prevRps->Print(std::cout);
+				//std::cout << "current ID = " << this->currentId << std::endl;
+				//stationTransmit->m_oldRawStart = this->m_prevRps->GetRawSlotStartFromAid(*ci);
+			}
 			for (int i = 0; i < receivedFromAids.size(); i++)
 			{
 				if (*ci == receivedFromAids[i])
@@ -1602,20 +1606,20 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    }
 	    model.addConstr(term == yDiffP, "CON_3rdNotPaged&Outsdanding");
 
-	    //term = 0;
+	    term = 0;
 	    for (int i=yUnionP; i < m; i++)
 	    {
 	    	GRBLinExpr sum_n_zih (0);
 	    	for (int h=0; h < n; h++)
 	    	{
-	    		//term += Ws[i][h] * (1 - pagedAids.find (h)->second) * (1 - outsdandingAids.find (h)->second);
+	    		term += Ws[i][h] * (1 - pagedAids.find (h)->second) * (1 - outsdandingAids.find (h)->second);
 	    		sum_n_zih += Zs[i][h];
 	    	}
 	    	std::ostringstream vname;
 	    	vname << "CON_4thDurationRaw" << i;
 	    	model.addConstr (sum_n_zih >= 2 * txTime, vname.str());
 	    }
-	    //model.addConstr(term == m - yUnionP, "CON_4thNeitherPagedNorOutsdanding");
+	    model.addConstr(term <= m - yUnionP, "CON_4thNeitherPagedNorOutsdanding");
 
 	    // Add constrains on number of RAW slots that are not assigned to Paged or Outstanding stations
 	    model.addConstr (effNumRaws - yUnionP <= 2 * scheduledUlTotal, "CON_restRawsNum");
@@ -2163,8 +2167,8 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     		 //DistributeStationsToRaws ();
     		 std::cout << std::endl << std::endl;
     		 Time startTime = Simulator::Now();
-    		 //bool success = OptimizeRaw(criticalList, 4, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath);
-    		 //if (!success)
+    		 bool success = OptimizeRaw(criticalList, 4, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath);
+    		 if (!success)
     			 DistributeStationsToRaws ();
     		 NS_LOG_UNCOND ("Start time=" << startTime << "End time=" << Simulator::Now());
     	 }

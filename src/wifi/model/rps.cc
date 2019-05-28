@@ -380,6 +380,8 @@ RPS::GetNumAssignedRaws (uint16_t aid)
 uint64_t
 RPS::GetRawSlotStartFromAid (uint16_t aid, uint32_t rawindex) const
 {
+
+	//this->Print(std::cout);
 	NS_ASSERT (rawindex < this->GetNumberOfRawGroups());
 	int counter (0), timeacc(0);
 	for (int i = 0; i < this->GetNumberOfRawGroups(); i++)
@@ -389,6 +391,7 @@ RPS::GetRawSlotStartFromAid (uint16_t aid, uint32_t rawindex) const
 		{
 			if (rawindex == counter)
 			{
+				//NS_LOG_UNCOND ("slot num=" << ass.GetSlotNum());
 				int slotindex = aid % ass.GetSlotNum();
 				return timeacc += ass.GetSlotDuration().GetMicroSeconds() * slotindex;
 			}
