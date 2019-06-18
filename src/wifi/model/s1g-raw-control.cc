@@ -155,7 +155,7 @@ Slot::SetSlotStartTime (Time start)
 	m_slotStartTime = start;
 }
 
-SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0), m_oldRawStart (INT_MAX), m_newRawStart (INT_MAX), m_tSent (Time ()), m_tSentPrev (Time ()), m_tInterval (Time ()), m_tIntervalMin (Time ()), m_tIntervalMax (Time ()), m_tEnqMin (Time ()), m_outstandingUplinkPackets (0), m_scheduledUplinkPackets (0)
+SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0), m_oldRawStart (INT_MAX), m_newRawStart (INT_MAX), m_tSent (Time ()), m_tSentPrev (Time ()), m_tInterval (Time ()), m_tIntervalMin (Time ()), m_tIntervalMax (Time ()), m_tEnqMin (Time ()), m_outstandingUplinkPackets (0), m_scheduledUplinkPackets (0), m_numOutstandingDl(0)
 {
 
 }
@@ -330,6 +330,7 @@ S1gRawCtr::S1gRawCtr ()
 	m_prevRps = nullptr;
 	//m_prevPrevRps = nullptr;
 	m_rps = new RPS;
+	m_startOptimalOpp = Time();
 }
 
 S1gRawCtr::~S1gRawCtr ()
@@ -417,7 +418,7 @@ S1gRawCtr::UpdateSensorStaInfo (std::vector<uint16_t> sensorList, std::vector<ui
 }
 
 void
-S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::string outputpath)
+S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vector<uint16_t> receivedFromAids, std::vector<uint16_t> enqueuedToAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::map<uint16_t, uint16_t> numExpectedDlPacketsForAids, std::string outputpath)
 {
 	for (std::vector<uint16_t>::iterator ci = criticalAids.begin(); ci != criticalAids.end(); ci++)
 	{
@@ -558,9 +559,10 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 		sta->m_scheduledUplinkPackets = numScheduledUl;
 		NS_LOG_DEBUG("Sta " << sta->GetAid() << " delivered the last packet to AP at " << sta->m_tSent << ", interval=" << sta->m_tInterval << ", est. num. of outstanding UL pacets is " << sta->m_outstandingUplinkPackets);
 		NS_LOG_DEBUG("Sta " << sta->GetAid() << " should transmit " << numScheduledUl << " packets in the next BI, interval=" << sta->m_tInterval);
-
+		sta->m_numOutstandingDl = numExpectedDlPacketsForAids.find(sta->GetAid())->second;
 
 	}
+
 
 	NS_LOG_DEBUG ("receivedFromAids.size () = " << receivedFromAids.size () << ", m_criticalStations.size() = " << m_criticalStations.size() << ", m_aidListPaged.size = " << this->m_aidListPaged.size() << ", currentBeacon = " << currentId);
 	NS_LOG_DEBUG ("enqueuedToAids = " << enqueuedToAids.size());
@@ -1355,6 +1357,8 @@ S1gRawCtr::IsInfoAvailableForAllSta()
 	return true;
 }
 
+//first attempt
+/*
 bool
 S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath)
 {
@@ -1515,15 +1519,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    uint32_t numTimPaged (allToPage.size() > 0 ? 1 : 0);
 	    GRBLinExpr effBeaconTxTime = 40 + 240 + 40 * ((14 + 8 * (65 + pageBitmapLen + numTimPaged * (63 + pagedSubblocks) + effNumRaws)) / 12); //us
 	    GRBLinExpr effChanelTime = BeaconInterval - effBeaconTxTime;//T_CH us
-	    /*for (int i=0; i < m; i++)
-	    {
-	    	std::ostringstream vname;
-	    	vname << "CON_CiLeqChannelTime" << i;
-	    	model.addConstr(effChanelTime >= Cs[i], vname.str());
-	    	vname.str("");
-	    	vname << "CON_CiGeq0" << i;
-	    	model.addConstr(Cs[i] >= 0, vname.str());
-	    }*/
+
 
 	    //Add 4 constrains on z_{ih} \forall i,h
 	    GRBLinExpr sumSumZs (0);
@@ -1709,93 +1705,6 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    	model.addQConstr(Simulator::Now().GetMicroSeconds() + sumCkToI - txTime >= sum1 + sum2 + sumFA - sum4 - sumSA, vname.str());
 	    }
 
-	    // Add last constraint
-	    /*GRBVar Os[m][n]; //v_{ih} * c_{k}
-	    for (int h=0; h<n; h++)
-	    {
-	    	for (int i=yUnionP; i<m-1; i++)
-	    	{
-	    		std::ostringstream vname;
-	    		vname << "o" << i << "." << h;
-	    		Os[i][h] = model.addVar (0.0, MaxChannelTime, 0.0, GRB_CONTINUOUS, vname.str());
-	    		vname.str("");
-	    		vname << "CON_Oihk<=TchVih" << i << "." << h;
-	    		model.addQConstr(Os[i][h] <= effChanelTime * Vs[i][h], vname.str());
-    			vname.str("");
-    			vname << "CON_Oihk>=0" << i << "." << h;
-    			model.addConstr(Os[i][h] >= 0, vname.str());
-	    		for (int k=yUnionP; k<=i; k++)
-	    		{
-	    			vname.str("");
-	    			vname << "CON_Oihk<=Ck" << i << "." << h << "." << k;
-	    			model.addConstr(Os[i][h] <= Cs[k], vname.str());
-	    			vname.str("");
-	    			vname << "CON_Oihk>=Ck+Tch(vih-1)" << i << "." << h << "." << k;
-	    			model.addQConstr(Os[i][h] >= Cs[k] + effChanelTime * (Vs[i][h] - 1), vname.str());
-	    		}
-	    	}
-	    }
-
-	    GRBVar Us[m][m][n]; //k.j.h
-	    for (int h=0; h<n; h++)
-	    {
-	    	for (int i=yUnionP; i<m-1; i++)
-	    	{
-	    		for (int j=i+1; j<m; j++)
-	    		{
-	    			for (int k=yUnionP; k<j; k++)
-	    			{
-	    				std::ostringstream vname;
-	    				vname << "u" << k << "." << j << "." << h;
-	    				Us[k][j][h] = model.addVar (0.0, MaxChannelTime, 0.0, GRB_CONTINUOUS, vname.str());
-
-	    				vname.str("");
-	    				vname << "CON_Ukih<=TchWjh" << k << "." << j << "." << h;
-	    				model.addQConstr(Us[k][j][h] <= effChanelTime * Ws[j][h], vname.str());
-
-	    				vname.str("");
-	    				vname << "CON_Ukih<=Ck" << k << "." << j << "." << h;
-	    				model.addConstr(Us[k][j][h] <= Cs[k], vname.str());
-
-	    				vname.str("");
-	    				vname << "CON_Ukih>=Ck+Tch(vih-1)" << k << "." << j << "." << h;
-	    				model.addQConstr(Us[k][j][h] >= Cs[k] + effChanelTime * (Ws[j][h] - 1), vname.str());
-
-	    				vname.str("");
-	    				vname << "CON_Ukih>=0" << k << "." << j << "." << h;
-	    				model.addConstr(Us[k][j][h] >= 0, vname.str());
-
-	    			}
-	    		}
-	    	}
-	    }
-	    uint64_t tProcUs = tProcessing.GetMicroSeconds();
-	    GRBQuadExpr firstThree (0), secondThree(0), rightSide2(0), sumSO (0), sumFO(0);
-	    GRBLinExpr sumO (0);
-	    for (int h=0; h<n; h++)
-	    {
-	    	for (int i=yUnionP; i<m-1; i++)
-	    	{
-	    		firstThree += tProcUs * (Vs[i][h] - Ss[i][h] * Vs[i][h] + Fs[i][h] * Vs[i][h]);
-	    		for (int k = yUnionP; k <= i; k++)
-	    		{
-	    			sumO += Os[i][h];
-	    			sumSO += Os[i][h] * Ss[i][h];
-	    			sumFO += Os[i][h] * Fs[i][h];
-	    			secondThree += sumO + sumSO + sumFO;
-	    		}
-	    		for (int j = i+1; j < m; j++)
-	    		{
-	    			for (int k = yUnionP; k < j; k++)
-	    			{
-	    				rightSide2 += Ss[i][h] * Us[k][j][h] - Fs[i][h] * Us[k][j][h];
-	    			}
-	    			std::ostringstream vname;
-	    			vname << "CON_JIH3rdFinal" << j << "." << i << "." << h;
-	    			model.addQConstr(firstThree + secondThree <= rightSide2, vname.str());
-	    		}
-	    	}
-	    }*/
 	    uint64_t tProcUs = tProcessing.GetMicroSeconds();
 	    GRBQuadExpr firstThree (0), secondThree(0), rightSide2(0);
 	    GRBLinExpr sumCkI (0), sumCkJ (0);
@@ -1867,85 +1776,6 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 	    	os << std::endl;
 	    }
 	    os << std::endl;
-	    /*for (int i = 0; i < m; i++)
-	    	os << std::left << std::setw(3) << Cs[i].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Cs[i].get(GRB_DoubleAttr_X);
-	    os << std::endl;
-	    for (int h = 0; h < n; h++)
-	    {
-	    	for (int i = yUnionP; i < m; i++)
-	    		os << std::left << std::setw(6) << Qs[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Qs[i][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }
-	    os << std::endl;
-	    for (int h = 0; h < n; h++)
-	    {
-	    	for (int i = yUnionP; i < m; i++)
-	    		os << std::left << std::setw(6) << Ws[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Ws[i][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }
-	    os << std::endl;
-	    for (int h = 0; h < n; h++)
-	    {
-	    	for (int i = yUnionP; i < m; i++)
-	    		os << std::left << std::setw(6) << Fs[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Fs[i][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }
-	    os << std::endl;
-	    for (int h = 0; h < n; h++)
-	    {
-	    	for (int i = yUnionP; i < m; i++)
-	    		os << std::left << std::setw(10) << Ss[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Ss[i][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }
-	    os << std::endl;
-
-	    for (int h = 0; h < n; h++)
-	    {
-	    	for (int i = 0; i < m-1; i++)
-	    		for (int j = i + 1; j < m; j++)
-	    			os << std::left << std::setw(10) << Vs[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Vs[i][j][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }
-	    os << std::endl;
-	    for (int h = 0; h < n; h++)
-	    {
-	    	for (int i = 0; i < m; i++)
-	    		os << std::left << std::setw(10) << As[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << As[i][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }
-	    os << std::endl;
-	    for (int h=0; h<n; h++)
-	    {
-	    	for (int i=yUnionP; i<m-1; i++)
-	    		for (int j = i+1; j < m; j++)
-	    			os << std::left << std::setw(10) << svEq[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << svEq[i][j][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }
-	    os << std::endl;
-	    for (int h=0; h<n; h++)
-	    {
-	    	for (int i=yUnionP; i<m-1; i++)
-	    		for (int j = i+1; j < m; j++)
-	    			os << std::left << std::setw(10) << fvEq[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << fvEq[i][j][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }
-	    os << std::endl;
-	    for (int h=0; h<n; h++)
-	    {
-	    	for (int i=yUnionP; i<m-1; i++)
-	    		for (int j = i+1; j < m; j++)
-	    			os << std::left << std::setw(10) << swEq[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << swEq[i][j][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }
-	    os << std::endl;
-	    for (int h=0; h<n; h++)
-	    {
-	    	for (int i=yUnionP; i<m-1; i++)
-	    		for (int j = i+1; j < m; j++)
-	    			os << std::left << std::setw(10) << fwEq[i][j][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << fwEq[i][j][h].get(GRB_DoubleAttr_X);
-	    	os << std::endl;
-	    }*/
-
 
 	    os.close();
 
@@ -2000,10 +1830,524 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t
 		  return false;
 	  }
 }
+*/
 
+//Second attempt
+bool
+S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath)
+{
+	if (!IsInfoAvailableForAllSta())
+	    	 return false;
+	else if (m_startOptimalOpp == Time ())
+		m_startOptimalOpp = Simulator::Now();
+	uint32_t n = criticalList.size();
+
+	// Create an environment
+	GRBEnv env = GRBEnv();
+	env.set("LogFile", "./././rawOpt.log");
+
+	GRBVar w[m][n];
+	GRBVar c[m];
+	GRBVar u[m][n];
+	GRBVar d[m][n];
+	GRBVar tstart[m];
+	GRBVar tend[m];
+	GRBVar meff;
+	GRBVar Tch;
+	GRBVar f[m][n];
+	GRBVar s[m][n];
+	GRBVar r[m];
+
+	try {
+	    // Create an empty model
+	    GRBModel model = GRBModel(env);
+
+	    //Constants that will be used in the model
+	    uint32_t MaxChannelTime, BeaconTxTimeMin (2040); //us
+	    MaxChannelTime = BeaconInterval - BeaconTxTimeMin; //us
+	    std::sort(criticalList.begin(), criticalList.end());
+
+	    uint32_t scheduledUlTotal (0), numExectedPacketsTotal (0);
+	    std::map<uint16_t, bool> pagedAids, outsdandingAids;
+	    for (int h=0; h < criticalList.size(); h++)
+	    {
+	    	uint16_t aid = criticalList[h];
+	    	SensorActuator * sta = LookupCriticalSta (aid);
+	    	scheduledUlTotal += sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets;
+	    	if (sta->m_numOutstandingDl)
+	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
+	    	else
+	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 0));
+
+	    	bool outstandingUl = sta->m_tSent + sta->m_tInterval <= Simulator::Now();
+	    	if (outstandingUl)
+	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 1));
+	    	else
+	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 0));
+	    	numExectedPacketsTotal += (uint32_t)pagedAids.find(h)->second + (uint32_t)outsdandingAids.find(h)->second;
+	    }
+	    numExectedPacketsTotal += 2 * scheduledUlTotal;
+	    std::ostringstream vname;
+	    for (int i = 0; i < m; i++)
+	    {
+	    	vname.str("");
+	    	vname << "c" << i;
+	    	c[i] = model.addVar(0.0, MaxChannelTime, 0.0,  GRB_CONTINUOUS, vname.str()); //upper bound= 246140.0 us in text
+	    	vname.str("");
+	    	vname << "tstart" << i;
+	    	tstart[i] = model.addVar(0.0, BeaconInterval, 0.0,  GRB_CONTINUOUS, vname.str());
+	    	vname.str("");
+	    	vname << "tend" << i;
+	    	tend[i] = model.addVar(0.0, BeaconInterval, 0.0,  GRB_CONTINUOUS, vname.str());
+	    	vname.str("");
+	    	vname << "r" << i;
+	    	r[i] = model.addVar(0.0, 1.0, 0.0,  GRB_BINARY, vname.str());
+
+	    	for (int h = 0; h < n; h++)
+	    	{
+	    		vname.str("");
+	    		vname << "w" << i << "." << h;
+	    		w[i][h] = model.addVar (0.0, 1.0, 0.0, GRB_BINARY, vname.str());
+	    		vname.str("");
+	    		vname << "u" << i << "." << h;
+	    		u[i][h] = model.addVar (0.0, 1.0, 0.0, GRB_BINARY, vname.str());
+	    		vname.str("");
+	    		vname << "d" << i << "." << h;
+	    		d[i][h] = model.addVar (0.0, 1.0, 0.0, GRB_BINARY, vname.str());
+	    		vname.str("");
+	    		vname << "s" << i;
+	    		s[i][h] = model.addVar(0.0, m/2, 0.0,  GRB_INTEGER, vname.str());
+	    		vname.str("");
+	    		vname << "f" << i;
+	    		f[i][h] = model.addVar(0.0, m/2, 0.0,  GRB_INTEGER, vname.str());
+	    	}
+	    }
+
+	    // Objective + Constraint 40 + Constraint 44 +  + Constraint 49
+	    GRBQuadExpr obj (0);
+	    for (int i = 0; i < m; i++)
+	    {
+	    	vname.str("");
+	    	vname << "CON_40_" << i;
+	    	GRBLinExpr sumwh (0);
+	    	for (int h = 0; h < n; h++)
+	    	{
+	    		obj += w[i][h]*c[i];
+	    		sumwh += w[i][h];
+	    	}
+	    	model.addConstr(sumwh <= 1, vname.str());
+	    	vname.str("");
+	    	vname << "CON_44.left_" << i;
+	    	model.addQConstr(r[i] * c[i] + r[i] >= c[i] , vname.str());
+	    	vname.str("");
+	    	vname << "CON_44.right_" << i;
+	    	model.addQConstr(r[i] * c[i] + r[i] <= 1.9999 * c[i] + 0.9999, vname.str());
+	    	vname.str("");
+	    	vname << "CON_49.left_" << i;
+	    	model.addConstr(tProcessing.GetMicroSeconds() * sumwh <= c[i], vname.str());
+	    	vname.str("");
+	    	vname << "CON_49.right_" << i;
+	    	model.addConstr(246140 >= c[i], vname.str());
+	    }
+	    model.setObjective(obj, GRB_MINIMIZE);
+
+	    // Constraint 41 + Constraint 42 + Constraint 43
+	    for (int h=0; h < n; h++)
+	    {
+	    	GRBLinExpr sumwi (0);
+	    	for (int i=0; i < m; i++)
+	    	{
+	    		sumwi += w[i][h];
+	    		GRBLinExpr sumwUptoI (0);
+	    		for (int k=0; k < i; k++)
+	    			sumwUptoI += w[k][h];
+	    		vname.str("");
+	    		vname << "CON_42.left_" << i << "." << h;
+	    		model.addConstr(f[i][h] >= 0.5 * sumwUptoI - 0.5, vname.str());
+	    		vname.str("");
+	    		vname << "CON_42.right_" << i << "." << h;
+	    		model.addConstr(f[i][h] <= 0.5 * sumwUptoI, vname.str());
+	    		vname.str("");
+	    		vname << "CON_43.left_" << i << "." << h;
+	    		model.addConstr(s[i][h] >= 0.5 * sumwUptoI, vname.str());
+	    		vname.str("");
+	    		vname << "CON_43.right_" << i << "." << h;
+	    		model.addConstr(s[i][h] <= 0.5 + 0.5 * sumwUptoI, vname.str());
+	    	}
+	    	vname.str("");
+	    	vname << "CON_41_" << h;
+	    	model.addConstr(sumwi >= 0, vname.str());
+	    }
+	    // Constraint 45 + Constraint 46
+	    GRBLinExpr sumwih (0), sumri (0), sumci (0);
+	    for (int i=0; i < m; i++)
+	    {
+	    	sumri += r[i]; // for Constraint 50
+	    	sumci += c[i]; // for Constraint 52
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		uint16_t ph (pagedAids.find(h)->second);
+	    		vname.str("");
+	    		vname << "CON_45_" << i << "." << h;
+	    		GRBLinExpr uBracket (1 - s[i][h] + f[i][h] - ph + 2 * ph * s[i][h] - 2 * ph * f[i][h]);
+	    		model.addQConstr(u[i][h] == w[i][h] * uBracket, vname.str());
+	    		GRBLinExpr dBracket (s[i][h] - f[i][h] + ph - 2 * ph * s[i][h] + 2 * ph * f[i][h]);
+	    		vname.str("");
+	    		vname << "CON_46_" << i << "." << h;
+	    		model.addQConstr(d[i][h] == w[i][h] * dBracket, vname.str());
+	    		sumwih += w[i][h]; // for Constraint 47 and Constraint 48
+	    	}
+	    }
+	    // Constraint 47
+	    vname.str("");
+	    vname << "CON_47_";
+	    model.addConstr(sumwih <= numExectedPacketsTotal, vname.str());
+	    // Constraint 48
+	    vname.str("");
+	    vname << "CON_48_";
+	    model.addConstr(sumwih >= 2 * scheduledUlTotal, vname.str());
+	    // Constraint 50
+	    vname.str("");
+	    vname << "CON_50_";
+	    model.addConstr(meff == sumri, vname.str());
+
+	    // Constraint 51
+	    uint32_t pagedSubblocks (0), pageBitmapLen(0);
+	    // Assumption: only 1 TIM - this will not work for multiple TIMs. Paged subblocks then must be counted separately for each TIM
+	    auto allToPage = m_aidListPaged;
+	    allToPage.insert(allToPage.end(), m_aidForcePage.begin(), m_aidForcePage.end());
+	    if (allToPage.size())
+	    {
+	    	std::sort(allToPage.begin(), allToPage.end());
+	    	pagedSubblocks = std::unique(allToPage.begin(), allToPage.end(), [](const uint16_t a, const uint16_t b){return ((a >> 3) & 0x07) == ((b >> 3) & 0x07); }) - allToPage.begin();
+	    	pageBitmapLen =1; //TODO this can be 0,1,2,3,4 and should be read from the new page slice that will be constructed in this beacon
+	    }
+	    uint32_t numTimPaged (allToPage.size() > 0 ? 1 : 0);
+	    GRBLinExpr effBeaconTxTime = 40 + 240 + 40 * ((14 + 8 * (65 + pageBitmapLen + numTimPaged * (63 + pagedSubblocks) + meff)) / 12); //us
+	    vname.str("");
+	    vname << "CON_51_";
+	    model.addConstr(Tch == BeaconInterval - effBeaconTxTime, vname.str());
+
+
+	    // Constraint 52
+	    vname.str("");
+	    vname << "CON_52_";
+	    model.addConstr(Tch >= sumci, vname.str());
+
+
+	    /*
+	    //Add 4 constrains on z_{ih} \forall i,h
+	    GRBLinExpr sumSumZs (0);
+	    for (int i = 0; i < m; i++)
+	    	for (int h = 0; h < n; h++)
+	    	{
+	    		std::ostringstream vname;
+	    		vname << "CON_z1_" << i << "." << h;
+	    		model.addQConstr(0 <= effChanelTime * Ws[i][h] - Zs[i][h], vname.str());
+	    		vname.str("");
+	    		vname << "CON_z2_" << i << "." << h;
+	    		model.addConstr(Zs[i][h] -  Cs[i] <= 0, vname.str());
+	    		vname.str("");
+	    		vname << "CON_z3_" << i << "." << h;
+	    		model.addQConstr(0 >= Cs[i] + effChanelTime * (Ws[i][h] - 1) - Zs[i][h], vname.str());
+	    		vname.str("");
+	    		vname << "CON_z4_" << i << "." << h;
+	    		model.addConstr(Zs[i][h] >= 0, vname.str());
+
+	    		sumSumZs += Zs[i][h];
+	    	}
+
+	    // Add constrains on how to assign stas to slots: paged&outstanding, paged\outstanding, outstading\paged, rest
+
+
+	    GRBLinExpr term = 0;
+	    uint64_t txTime = 1240; //us for MCS8 on 2MHz and 64bytes payload
+	    for (int i=0; i < yIntersectionP; i++)
+	    {
+	    	GRBLinExpr sum_n_zih (0), sum_n_pyDuration (0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		term += Ws[i][h] * pagedAids.find (h)->second * outsdandingAids.find (h)->second;
+	    		sum_n_zih += Zs[i][h];
+	    		uint16_t aid = criticalList[h];
+	    		SensorActuator * sta = LookupCriticalSta (aid);
+	    		sum_n_pyDuration += Ws[i][h] * (sta->m_pendingDownlinkPackets + sta->m_outstandingUplinkPackets) * txTime;
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_1stDurationRaw" << i;
+	    	model.addConstr (sum_n_zih >= sum_n_pyDuration, vname.str());
+	    }
+	    model.addConstr(term == yIntersectionP, "CON_1stPaged&Outsdanding");
+
+	    term = 0;
+	    for (int i=yIntersectionP; i < yIntersectionP + pDiffY; i++)
+	    {
+	    	GRBLinExpr sum_n_zih (0), sum_n_pyDuration (0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		term += Ws[i][h] * pagedAids.find (h)->second * (1 - outsdandingAids.find (h)->second);
+
+	    		sum_n_zih += Zs[i][h];
+	    		uint16_t aid = criticalList[h];
+	    		SensorActuator * sta = LookupCriticalSta (aid);
+	    		sum_n_pyDuration += Ws[i][h] * sta->m_pendingDownlinkPackets * txTime;
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_2ndDurationRaw" << i;
+	    	model.addConstr (sum_n_zih >= sum_n_pyDuration, vname.str());
+	    }
+	    model.addConstr(term == pDiffY, "CON_2ndPaged&NotOutsdanding");
+
+	    term = 0;
+	    for (int i=yIntersectionP + pDiffY; i < yUnionP; i++)
+	    {
+	    	GRBLinExpr sum_n_zih (0), sum_n_pyDuration (0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		term += Ws[i][h] * (1 - pagedAids.find (h)->second) * outsdandingAids.find (h)->second;
+
+	    		sum_n_zih += Zs[i][h];
+	    		uint16_t aid = criticalList[h];
+	    		SensorActuator * sta = LookupCriticalSta (aid);
+	    		sum_n_pyDuration += Ws[i][h] * sta->m_outstandingUplinkPackets * txTime;
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_3rdDurationRaw" << i;
+	    	model.addConstr (sum_n_zih >= sum_n_pyDuration, vname.str());
+	    }
+	    model.addConstr(term == yDiffP, "CON_3rdNotPaged&Outsdanding");
+
+	    term = 0;
+	    for (int i=yUnionP; i < m; i++)
+	    {
+	    	GRBLinExpr sum_n_zih (0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		term += Ws[i][h] * (1 - pagedAids.find (h)->second) * (1 - outsdandingAids.find (h)->second);
+	    		sum_n_zih += Zs[i][h];
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_4thDurationRaw" << i;
+	    	model.addConstr (sum_n_zih >= 2 * txTime, vname.str());
+	    }
+	    model.addConstr(term <= m - yUnionP, "CON_4thNeitherPagedNorOutsdanding");
+
+	    // Add constrains on number of RAW slots that are not assigned to Paged or Outstanding stations
+	    model.addConstr (effNumRaws - yUnionP <= 2 * scheduledUlTotal, "CON_restRawsNum");
+	    model.addConstr (sumSumZs <= effChanelTime, "CON_totalRawsDurationLessThanEffChannelTime");
+
+	    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	    // Last 3 constrains
+	    //GRBVar Bs[m][n]; //s_{ih} * w_{ih}
+	    for (int i=yUnionP; i < m; i++)
+	    {
+	    	for (int h=0; h<n; h++)
+	    	{
+	    		std::ostringstream vname;
+
+
+	    		if (i < m-1)
+	    			for (int j=i+1; j < m; j++)
+	    			{
+	    				vname.str(""); vname << "CON_v" << i << "." << j << "." << h << "<=" << "w" << i << "." << h;
+	    				model.addConstr(Vs[i][j][h] <= Ws[i][h], vname.str());
+
+	    				vname.str(""); vname << "CON_v" << i << "." << j << "." << h << "<=" << "w" << j << "." << h;
+	    				model.addConstr(Vs[i][j][h] <= Ws[j][h], vname.str());
+
+	    				vname.str(""); vname << "CON_v" << i << "." << j << "." << h << ">=" << "w" << i << "." << h << "+w" << j << "." << h << "-1";
+	    				model.addConstr(Vs[i][j][h] >= Ws[i][h] + Ws[j][h] - 1, vname.str());
+	    			}
+
+	    		GRBLinExpr termSumUptoI (0);
+	    		for (int k=yUnionP; k < i; k++)
+	    		{
+	    			termSumUptoI += Ws[k][h];
+	    		}
+	    		vname.str("");
+	    		vname << "CON_q" << i << "." << h;
+	    		model.addConstr(Qs[i][h] == termSumUptoI, vname.str());
+	    		vname.str("");
+	    		vname << "CON_geq_f" << i << "." << h;
+	    		model.addConstr(Fs[i][h] >= Qs[i][h]/2 - 0.5, vname.str());
+	    		vname.str("");
+	    		vname << "CON_leq_f" << i << "." << h;
+	    		model.addConstr(Fs[i][h] <= Qs[i][h]/2, vname.str());
+
+	    		vname.str("");
+	    		vname << "CON_geq_s" << i << "." << h;
+	    		model.addConstr(Ss[i][h] >= Qs[i][h]/2, vname.str());
+	    		vname.str("");
+	    		vname << "CON_leq_s" << i << "." << h;
+	    		model.addConstr(Ss[i][h] <= Qs[i][h]/2 + 0.5, vname.str());
+	    	}
+	    }
+
+
+	    // Add 2nd constraint
+	    GRBLinExpr sumCkToI (0);
+	    for (int k=0; k <= yUnionP - 1; k++)
+	    	sumCkToI += Cs[k];
+
+	    for (int i=yUnionP; i < m; i++)
+	    {
+	    	GRBLinExpr rhs2 (0), lhs (0), sum1 (0), sum2 (0);;
+	    	sumCkToI += Cs[i];
+
+	    	GRBQuadExpr sumFA(0), sumSA (0), sum4(0);
+	    	for (int h=0; h < n; h++)
+	    	{
+	    		// 2nd constraint right hand side part
+	    		uint16_t aid = criticalList[h];
+	    		SensorActuator * sta = LookupCriticalSta (aid);
+	    		uint64_t num = (sta->m_tSent.GetMicroSeconds() + sta->m_tInterval.GetMicroSeconds() * sta->m_outstandingUplinkPackets + 2 * sta->m_tInterval.GetMicroSeconds());
+	    		rhs2 += num * Ws[i][h] + sta->m_tInterval.GetMicroSeconds() * As[i][h];
+
+	    		// 1st constraint right hand side part
+	    		sum2 += num * As[i][h];
+	    		num -= sta->m_tInterval.GetMicroSeconds();
+	    		sum1 += num * Ws[i][h];
+	    		sum4 += num * Ss[i][h] * Ws[i][h];
+	    		sumFA += sta->m_tInterval.GetMicroSeconds() * Fs[i][h] * As[i][h];
+	    		sumSA += sta->m_tInterval.GetMicroSeconds() * Ss[i][h] * As[i][h];
+	    	}
+	    	std::ostringstream vname;
+	    	vname << "CON_2ndBig" << i;
+	    	model.addConstr(Simulator::Now().GetMicroSeconds() + sumCkToI <= rhs2, vname.str());
+
+	    	vname.str("");
+	    	vname << "CON_1stBig" << i;
+	    	model.addQConstr(Simulator::Now().GetMicroSeconds() + sumCkToI - txTime >= sum1 + sum2 + sumFA - sum4 - sumSA, vname.str());
+	    }
+
+	    uint64_t tProcUs = tProcessing.GetMicroSeconds();
+	    GRBQuadExpr firstThree (0), secondThree(0), rightSide2(0);
+	    GRBLinExpr sumCkI (0), sumCkJ (0);
+	    for (int h=0; h<n; h++)
+	    {
+	    	for (int i=yUnionP; i<m-1; i++)
+	    	{
+	    		for (int j = i+1; j < m; j++)
+	    		{
+	    			firstThree += tProcUs * (Vs[i][j][h] - Ss[i][h] * Vs[i][j][h] + Fs[i][h] * Vs[i][j][h]);
+
+	    			std::ostringstream vname;
+
+	    			vname.str(""); vname << "svEq=Sih*Vijh" << i << "." << j << "." << h;
+	    			model.addQConstr(svEq[i][j][h] == Ss[i][h] * Vs[i][j][h], vname.str());
+
+	    			vname.str(""); vname << "fvEq=Fih*Vijh" << i << "." << j << "." << h;
+	    			model.addQConstr(fvEq[i][j][h] == Fs[i][h] * Vs[i][j][h], vname.str());
+
+	    			vname.str(""); vname << "swEq=Sih*Wjh" << i << "." << j << "." << h;
+	    			model.addQConstr(swEq[i][j][h] == Ss[i][h] * Ws[j][h], vname.str());
+
+	    			vname.str(""); vname << "fwEq=Fih*Wjh" << i << "." << j << "." << h;
+	    			model.addQConstr(fwEq[i][j][h] == Fs[i][h] * Ws[j][h], vname.str());
+
+	    			for (int k = yUnionP; k <= i; k++)
+	    			{
+	    				sumCkI += Cs[k];
+	    			}
+	    			secondThree += sumCkI * Vs[i][j][h] - sumCkI * svEq[i][j][h] + sumCkI * fvEq[i][j][h];
+
+
+	    			for (int k = yUnionP; k < j; k++)
+	    			{
+	    				sumCkJ += Cs[k];
+	    			}
+	    			rightSide2 += sumCkJ * swEq[i][j][h] - sumCkJ * fwEq[i][j][h];
+
+	    			vname.str("");
+	    			vname << "CON_JIH3rdFinal" << i << "." << j << "." << h;
+	    			model.addQConstr(firstThree + secondThree <= rightSide2, vname.str());
+	    		}
+	    	}
+	    }
+
+
+	    // Save problem
+	    model.write("OptRaw_c++.mps");
+	    model.write("OptRaw_c++.lp");
+
+	    // Optimize model
+	    model.optimize();
+
+	    std::ofstream os;
+	    std::string outputpath = "./optimization/";
+	    int num = currentId + 1;
+	    std::string fname = outputpath + "res_" + std::to_string(num) + ".txt";
+	    os.open(fname.c_str(), std::ios::out | std::ios::trunc);
+	    os << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
+
+
+	    for (int h = 0; h < n; h++)
+	    {
+	    	for (int i = 0; i < m; i++)
+	    	{
+	    		os << std::left << std::setw(6) << Zs[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << Zs[i][h].get(GRB_DoubleAttr_X);
+
+	    	}
+	    	os << std::endl;
+	    }
+	    os << std::endl;
+
+	    os.close();
+
+
+	    // Status checking
+	    int status = model.get(GRB_IntAttr_Status);
+
+	    if (status == GRB_INF_OR_UNBD ||
+	    		status == GRB_INFEASIBLE  ||
+	    		status == GRB_UNBOUNDED     )
+	    {
+	    	std::cout << "The model cannot be solved " <<
+	    			"because it is infeasible or unbounded" << std::endl;
+	    	return false;
+	    }
+	    if (status != GRB_OPTIMAL) {
+	    	std::cout << "Optimization was stopped with status " << status << std::endl;
+	    	return false;
+	    }
+	    std::vector<Slot> criticalSlots;
+	    Time acc = Time ();
+	    for (int i = 0; i < m; i++)
+	    {
+	    	Slot s;
+	    	for (int h = 0; h < n; h++)
+	    	{
+	    		uint64_t duration = Zs[i][h].get(GRB_DoubleAttr_X);
+	    		if (duration > 500)
+	    		{
+	    			s.SetAid(h+1);
+	    			s.SetSlotStartTime(acc);
+	    			acc += MicroSeconds (duration);
+	    			uint16_t count = ((uint64_t)duration - 500) / 120;
+	    			if (count < 256)
+	    				s.SetSlotFormat(0);
+	    			else if (count < 2048)
+	    				s.SetSlotFormat(1);
+	    			s.SetSlotCount(count);
+	    		}
+
+	    	}
+	    	criticalSlots.push_back(s);
+	    }
+	    EncodeRaws (criticalSlots);
+	    return true;*/
+	  } catch(GRBException e) {
+		  std::cout << "Error code = " << e.getErrorCode() << std::endl;
+		  std::cout << e.getMessage() << std::endl;
+		  return false;
+	  } catch(...) {
+		  std::cout << "Exception during optimization" << std::endl;
+		  return false;
+	  }
+}
 // Beacon duration), before that use NGroup=1 and initialize by ap-wifi-mac
 RPS
-S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath)
+S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, std::map<uint16_t,uint16_t> numExpectedDlPacketsForAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath)
  {
      NS_ASSERT ("S1gRawCtr should not be called");
      //gandalf ();
@@ -2149,14 +2493,14 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      }
      else if (m_prevRps != nullptr && criticalList.size())
      {
-    	 UpdateCriticalStaInfo (criticalList, receivedFromAids, enqueuedToAids, receivedTimes, sentTimes, outputpath);
+    	 UpdateCriticalStaInfo (criticalList, receivedFromAids, enqueuedToAids, receivedTimes, sentTimes, numExpectedDlPacketsForAids, outputpath);
     	 UpdateSensorStaInfo (sensorList, receivedFromAids, receivedTimes, sentTimes);
 
     	 delete m_rps;
     	 m_rps = new RPS;
 
 
-    	 Time tProcessing = MilliSeconds (10);
+    	 Time tProcessing = MilliSeconds (5);
 
     	 if (!IsInfoAvailableForAllSta())
     	 {

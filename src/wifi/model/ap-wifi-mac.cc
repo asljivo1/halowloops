@@ -524,7 +524,10 @@ void ApWifiMac::ForwardDown(Ptr<const Packet> packet, Mac48Address from,
 			/*if (IsPagedInDtim (aid))
 		{*/
 			m_rawSlotsEdca[edcaIndex][QosUtilsMapTidToAc(tid)]->Queue(packet, hdr);
-			this->m_enqueuedToAids.push_back(aid);
+
+			// m_everEnqueuedToAids is used to store all AIDs that came from the server, provided that they were sent by STAs in this BI.
+			// All AIDs that are in m_receivedAids (::Receive) and not in m_everEnqueuedToAids (::ForwardDown) are still processing at the server.
+			m_forwardedDownToAids.push_back(aid);
 			/*}
 		else
 		{
@@ -1203,6 +1206,7 @@ void ApWifiMac::SendAssocResp(Mac48Address to, bool success, uint8_t staType, bo
 					goto Addheader;
 			}
 			m_criticalAids.push_back(aid);
+			m_numExpectedDlPacketsForAids.insert(std::pair<uint16_t, uint16_t>(aid, 0));
 			NS_LOG_INFO("m_criticalAids =" << m_criticalAids.size ());
 		}
 		else if (serviceCharacteristic == AidRequest::SENSOR)
@@ -1533,18 +1537,61 @@ void ApWifiMac::SendOneBeacon(void) {
 			it++;
 		}
 
+		//Received from AIDs to forward to server and then back to AIDs
+		std::cout << "m_receivedAid (" << m_receivedAid.size() << ") = ";
+		for (auto a : m_receivedAid)
+			std::cout << " " << (int)a;
+		std::cout << std::endl;
+		std::cout << "m_enqueuedToAids (" << m_enqueuedToAids.size() << ") = ";
+		for (auto a : m_enqueuedToAids)
+			std::cout << " " << (int)a;
+		std::cout << std::endl;
+		std::cout << "m_forwardedDownToAids (" << m_forwardedDownToAids.size() << ") = ";
+		for (auto a : m_forwardedDownToAids)
+			std::cout << " " << (int)a;
+		std::cout << std::endl;
+		//remove duplicates
+		/*std::vector<uint16_t> everUnique = m_everEnqueuedToAids;
+		std::sort(everUnique.begin(), everUnique.end());
+		auto last = std::unique(everUnique.begin(), everUnique.end());
+		everUnique.erase(last, everUnique.end());
+		for (auto aid : everUnique)
+		{
+			int countInEver = std::count (m_everEnqueuedToAids.begin(), m_everEnqueuedToAids.end(), aid);
+			int countInEnq = std::count (m_enqueuedToAids.begin(), m_enqueuedToAids.end(), aid);
+			for (int i = 0; i < countInEver - countInEnq; i++)
+			{
+				m_sentToAids.push_back(aid);
+			}
+		}
+		std::cout << "m_sentToAids (" << m_sentToAids.size() << ") = ";
+		for (auto a : m_sentToAids)
+			std::cout << " " << (int)a;
+		std::cout << std::endl;*/
+		//std::vector<uint16_t> notYetPagedAids;
+		//std::set_difference(m_receivedAid.begin(), m_receivedAid.end(), m_forwardedDownToAids.begin(), m_forwardedDownToAids.end(), std::inserter(notYetPagedAids, notYetPagedAids.begin()));
+
+		//std::vector<uint16_t> notYetPagedUnique = notYetPagedAids;
+		//std::sort(notYetPagedUnique.begin(), notYetPagedUnique.end());
+		//auto last = std::unique(notYetPagedUnique.begin(), notYetPagedUnique.end());
+		//notYetPagedUnique.erase(last, notYetPagedUnique.end());
+		for (auto aid : this->m_criticalAids)
+		{
+			int countRec = std::count (m_receivedAid.begin(), m_receivedAid.end(), aid);
+			int countFd = std::count (m_forwardedDownToAids.begin(), m_forwardedDownToAids.end(), aid);
+			m_numExpectedDlPacketsForAids.find(aid)->second += countRec - countFd;
+		}
 		RPS *p_rps;
-		//NS_LOG_UNCOND ("AP -- m_sentToAids.size=" << m_sentToAids.size() << ", m_enqueuedToAids.size=" << m_enqueuedToAids.size());
-		if (this->m_criticalAids.size())
+		NS_LOG_UNCOND ("AP -- m_sentToAids.size=" << m_sentToAids.size() << ", m_enqueuedToAids.size=" << m_enqueuedToAids.size());
+		if (false) //this->m_criticalAids.size()
 		{
 			RPS rps;
-			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
+			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, m_numExpectedDlPacketsForAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
 			m_aidsForcePage = m_S1gRawCtr.GetAidsToForcePage();
 			UpdateQueues(rps);
 			//clear RPS vector
 			std::for_each(m_rpsset.rpsset.begin(), m_rpsset.rpsset.end(), delete_pointed_to<RPS>);
 			m_rpsset.rpsset.clear();
-			//m_rpsset.setlen(0);
 
 			RPS *newRps = new RPS;
 			for (int i = 0; i < rps.GetNumberOfRawGroups(); i++)
@@ -1898,7 +1945,9 @@ void ApWifiMac::SendOneBeacon(void) {
 				m_receivedAid.clear();
 				m_receivedTimes.clear();
 				m_sentTimes.clear();
-				//m_sentToAids.clear();
+				m_sentToAids.clear();
+				m_forwardedDownToAids.clear();
+				//m_everEnqueuedToAids = m_enqueuedToAids;
 				m_enqueuedToAids.clear();
 			}
 		}
@@ -1907,7 +1956,9 @@ void ApWifiMac::SendOneBeacon(void) {
 		m_receivedAid.clear(); //release storage
 		m_receivedTimes.clear();
 		m_sentTimes.clear();
-		//m_sentToAids.clear();
+		m_sentToAids.clear();
+		m_forwardedDownToAids.clear();
+		//m_everEnqueuedToAids = m_enqueuedToAids;
 		this->m_enqueuedToAids.clear(); //is this ok? TODO
 		hdr.SetBeacon();
 		hdr.SetAddr1(Mac48Address::GetBroadcast());

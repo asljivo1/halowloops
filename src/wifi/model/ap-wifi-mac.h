@@ -351,6 +351,8 @@ private:
   std::vector<uint16_t> m_offloadAids;
   std::vector<uint16_t> m_criticalAids; //serviceCharacteristic of the AidRequest is critical stations (loops)
   std::vector<uint16_t> m_enqueuedToAids;
+  std::vector<uint16_t> m_forwardedDownToAids;
+  std::map<uint16_t,uint16_t> m_numExpectedDlPacketsForAids; // (aid, numpack)
   std::vector<uint16_t> m_sentToAids;
   std::map<uint16_t, Mac48Address> m_AidToMacAddr;
   std::map<Mac48Address, bool> m_accessList;
