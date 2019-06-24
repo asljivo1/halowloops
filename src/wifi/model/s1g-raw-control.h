@@ -229,7 +229,7 @@ public:
   virtual ~S1gRawCtr ();
 //this->m_criticalAids, this->m_sensorAids, this->m_offloadAids, this->GetBeaconInterval(), this->m_rpsset.rpsset.back()
     RPS  UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, std::map<uint16_t, uint16_t> numExpectedDlPacketsForAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath);
-  bool OptimizeRaw (std::vector<uint16_t> criticalList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath);
+  bool OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath);
   bool IsInfoAvailableForAllSta ();
   void configureRAW ();
   RPS GetRPS ();

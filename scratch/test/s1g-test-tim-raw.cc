@@ -1593,7 +1593,7 @@ int main(int argc, char *argv[]) {
 
 	LogComponentEnable ("ApWifiMac", LOG_LEVEL_INFO);
 	//LogComponentEnable ("StaWifiMac", LOG_LEVEL_INFO);
-	LogComponentEnable ("EdcaTxopN", LOG_LEVEL_DEBUG);
+	//LogComponentEnable ("EdcaTxopN", LOG_LEVEL_DEBUG);
 	//LogComponentEnable ("MacLow", LOG_LEVEL_DEBUG);
 
 	bool OutputPosition = true;

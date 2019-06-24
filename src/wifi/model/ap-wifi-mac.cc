@@ -1583,7 +1583,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		}
 		RPS *p_rps;
 		NS_LOG_UNCOND ("AP -- m_sentToAids.size=" << m_sentToAids.size() << ", m_enqueuedToAids.size=" << m_enqueuedToAids.size());
-		if (false) //this->m_criticalAids.size()
+		if (this->m_criticalAids.size()) //
 		{
 			RPS rps;
 			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, m_numExpectedDlPacketsForAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
@@ -2200,6 +2200,21 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 				Time sentAt = seqTs.GetTs();
 				//NS_LOG_UNCOND ("******** sentAt=" << sentAt);
 				m_sentTimes.push_back(sentAt);
+				uint8_t mac[6];
+				from.CopyTo(mac);
+				uint8_t aid_l = mac[5];
+				uint8_t aid_h = mac[4] & 0x1f;
+				uint16_t aid = (aid_h << 8) | (aid_l << 0); //assign mac address as AID
+				m_receivedAid.push_back(aid); //to change
+				m_receivedTimes.push_back(Simulator::Now());
+				// AP does nothing until it finds out all traffic intervals of all critical stations, to prevent accumulation of traffic
+				if (this->m_criticalAids.size() && std::find(m_criticalAids.begin(), m_criticalAids.end(), aid) != m_criticalAids.end())
+					if (!m_S1gRawCtr.IsInfoAvailableForAllSta())
+					{
+						m_forwardedDownToAids = m_receivedAid;
+						NS_LOG_UNCOND ("**************** m_forwardedDownToAids = m_receivedAid **************");
+						return;
+					}
 				if (hdr->IsQosData()) {
 					if (hdr->IsQosAmsdu()) {
 						NS_LOG_DEBUG(
@@ -2212,13 +2227,7 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 				} else {
 					ForwardUp(packet, from, bssid);
 				}
-				uint8_t mac[6];
-				from.CopyTo(mac);
-				uint8_t aid_l = mac[5];
-				uint8_t aid_h = mac[4] & 0x1f;
-				uint16_t aid = (aid_h << 8) | (aid_l << 0); //assign mac address as AID
-				m_receivedAid.push_back(aid); //to change
-				m_receivedTimes.push_back(Simulator::Now());
+
 			} else if (to.IsGroup() || m_stationManager->IsAssociated(to)) {
 				NS_LOG_DEBUG("forwarding frame from=" << from << ", to=" << to);
 				Ptr<Packet> copy = packet->Copy();
