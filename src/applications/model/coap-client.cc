@@ -403,7 +403,10 @@ CoapClient::Send (uint8_t *data, size_t datalen)
 	// add sequence header to the packet
 #ifdef WITH_SEQ_TS
 	SeqTsHeader seqTs;
-	seqTs.SetSeq (m_sent);
+	if (m_sent > 1)
+		seqTs.SetSeq (m_sent - 2);
+	else
+		seqTs.SetSeq (m_sent);
 	p->AddHeader (seqTs);
 #endif
 	std::stringstream peerAddressStringStream;

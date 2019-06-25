@@ -1173,7 +1173,7 @@ void configureCoapServer() {
 	if (config.nControlLoops > 0)
 	{
 		CoapServerHelper clServer(5683);
-		clServer.SetAttribute("ProcessingDelay", TimeValue (MilliSeconds (10)));
+		clServer.SetAttribute("ProcessingDelay", TimeValue (MilliSeconds (config.processingDelay)));
 		for (int i = 0; i < config.nControlLoops; i++)
 		{
 			serverApp = clServer.Install(externalNodes.Get(i));

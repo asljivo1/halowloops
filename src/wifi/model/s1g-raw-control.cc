@@ -542,24 +542,30 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 		}
 	}
 
+	m_aidForcePage.clear();
 	for (auto sta : m_criticalStations)
 	{
 		int numOutstandingUl (0);
 		while (sta->m_tInterval != Time() && sta->m_tSent + (numOutstandingUl + 1) * sta->m_tInterval <= Simulator::Now())
 		{
 			numOutstandingUl++;
+			if (std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
+				m_aidForcePage.push_back(sta->GetAid());
 		}
 		sta->m_outstandingUplinkPackets = numOutstandingUl;
 		int numScheduledUl (0);
 		while (sta->m_tInterval != Time() && sta->m_tSent + (numOutstandingUl + numScheduledUl + 1) * sta->m_tInterval > Simulator::Now() && sta->m_tSent + (numOutstandingUl + numScheduledUl + 1) * sta->m_tInterval < Simulator::Now() + MicroSeconds(m_beaconInterval))
 		{
 			numScheduledUl++;
+			if (std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
+				m_aidForcePage.push_back(sta->GetAid());
 		}
 		//numScheduledUl -= numOutstandingUl;
 		sta->m_scheduledUplinkPackets = numScheduledUl;
 		NS_LOG_DEBUG("Sta " << sta->GetAid() << " delivered the last packet to AP at " << sta->m_tSent << ", interval=" << sta->m_tInterval << ", est. num. of outstanding UL pacets is " << sta->m_outstandingUplinkPackets);
 		NS_LOG_DEBUG("Sta " << sta->GetAid() << " should transmit " << numScheduledUl << " packets in the next BI, interval=" << sta->m_tInterval);
 		sta->m_numOutstandingDl = numExpectedDlPacketsForAids.find(sta->GetAid())->second;
+
 
 	}
 
@@ -1382,6 +1388,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 		GRBVar tend[m];
 		GRBVar meff;
 		GRBVar Tch;
+		GRBVar a;
 		GRBVar f[m][n];
 		GRBVar s[m][n];
 		GRBVar r[m];
@@ -1391,7 +1398,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 		GRBModel model = GRBModel(env);
 
 		//Constants that will be used in the model
-		uint32_t MaxChannelTime, BeaconTxTimeMin (2040), tPacketTx (2040); //us
+		uint32_t MaxChannelTime, BeaconTxTimeMin (2040), tPacketTx (5000); //us
 	    MaxChannelTime = BeaconInterval - BeaconTxTimeMin; //us
 	    std::sort(criticalList.begin(), criticalList.end());
 
@@ -1419,6 +1426,9 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    vname.str("");
 	    vname << "meff";
 	    meff = model.addVar(0.0, m, 0.0,  GRB_INTEGER, vname.str());
+	    /*vname.str("");
+	    vname << "a";
+	    a = model.addVar(ceil((14 + 8 * (65 + 6*m)) / 12.), 172., 0.0,  GRB_INTEGER, vname.str());*/
 	    vname.str("");
 	    vname << "Tch";
 	    Tch = model.addVar(0.0, MaxChannelTime, 0.0,  GRB_CONTINUOUS, vname.str());
@@ -1566,10 +1576,19 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	pageBitmapLen =1; //TODO this can be 0,1,2,3,4 and should be read from the new page slice that will be constructed in this beacon
 	    }
 	    uint32_t numTimPaged (allToPage.size() > 0 ? 1 : 0);
-	    GRBLinExpr effBeaconTxTime = 40 + 240 + 40 * ((14 + 8 * (65 + pageBitmapLen + numTimPaged * (63 + pagedSubblocks) + meff)) / 12); //us
+	    uint32_t timSize (4 + numTimPaged * (1 + 2*31 + pagedSubblocks));
+	    //GRBLinExpr beaconSize = 27 + 26 + timSize + pageBitmapLen + 6 + 2 + 6 * meff;
+	    //GRBLinExpr ceilArg = (8 + 6 + 8 * beaconSize) / 12.;
+	    GRBLinExpr beaconTxDuration = 40 + 240 + 40 * ((14 + 8 * (65 + pageBitmapLen + numTimPaged * (63 + pagedSubblocks) + meff)) / 12) + 1000; //us
+	    /*vname.str("");
+	    vname << "CON_51a.left";
+	    model.addConstr(ceilArg <= a, vname.str());
 	    vname.str("");
-	    vname << "CON_51_";
-	    model.addConstr(Tch == BeaconInterval - effBeaconTxTime, vname.str());
+	    vname << "CON_51a.right";
+	    model.addConstr(a <= ceilArg + 0.9999, vname.str());*/
+	    vname.str("");
+	    vname << "CON_51";
+	    model.addConstr(Tch == BeaconInterval - beaconTxDuration, vname.str());
 
 
 	    // Constraint 52
@@ -1741,7 +1760,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 
 	    for (int i = 0; i < m; i++)
 	    {
-    		os << std::left << std::setw(6) << c[i].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << c[i].get(GRB_DoubleAttr_X);
+    		os << std::left << std::setw(13) << c[i].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << c[i].get(GRB_DoubleAttr_X);
 	    	for (int h = 0; h < n; h++)
 	    	{
 	    		os << std::left << std::setw(6) << w[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << w[i][h].get(GRB_DoubleAttr_X);
@@ -1751,7 +1770,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	os << std::endl;
 	    }
 	    os << std::endl;
-
+	    os << Tch.get(GRB_StringAttr_VarName) << " = " << Tch.get(GRB_DoubleAttr_X) << std::endl;
+	    os << meff.get(GRB_StringAttr_VarName) << " = " << Tch.get(GRB_DoubleAttr_X) << std::endl;
 	    os.close();
 
 
@@ -2099,6 +2119,7 @@ S1gRawCtr::GetBeaconTxDuration (std::vector<uint16_t> criticalList)
 
 		pageBitmapLen =1; //TODO this can be 0,1,2,3,4 and should be read from the new page slice that will be constructed in this beacon
 	}
+
 
 	uint32_t numTimPaged (allToPage.size() > 0 ? 1 : 0);
 	uint32_t rpsSize (2 + 6 * m_rps->GetNumberOfRawGroups());

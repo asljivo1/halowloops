@@ -42,6 +42,7 @@ Configuration::Configuration(int argc, char *argv[]) {
     cmd.AddValue("CycleTime", "Cycle time of all control loops", cycleTime);
     cmd.AddValue("EnableVirtualAids", "Enable the use of virtual AIDs", enableVirtualAids);
     cmd.AddValue("MaxNumPackets", "Maximum number of packets that APP can send (up to 4294967295u)", maxNumberOfPackets);
+    cmd.AddValue("ProcessingDelay", "Processing delay at control loop server in ms.", processingDelay);
 
 /*
     cmd.AddValue("SlotFormat", "format of NRawSlotCount, -1 will auto calculate based on raw slot num", SlotFormat);

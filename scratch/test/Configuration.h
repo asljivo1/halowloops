@@ -37,7 +37,7 @@ struct Configuration {
 	pageSlice pageS;
 	TIM tim;
 	uint16_t crossSlotBoundary;
-
+	uint32_t processingDelay = 5; //ms
 	/*pageSliceCount = 0 means:
 	 *
 	 *  - if pageSliceLength > 1, 32nd TIM in this DTIM can contain DL information for STAs that do not support
