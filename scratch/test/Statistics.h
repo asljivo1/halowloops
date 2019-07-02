@@ -14,6 +14,10 @@ public:
     Time TotalSimulationTime;
     Time TimeWhenEverySTAIsAssociated;
     Time EndApplicationTime;
+    Time TimeMipStarted;
+    Time TimeMipEnded;
+    int NumberOfIneasibleSolutions;
+    int NumberOfSolutions;
     long TotalBeaconsSizeInBytes;
     
     Statistics();

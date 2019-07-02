@@ -46,6 +46,11 @@ long double NodeStatistics::GetInterPacketDelayDeviation(std::vector<Time>& dela
 	else return -1; //implement exception handling for dummy nodes TODO
 }
 
+/*long NodeStatistics::GetNumberOfSentPackets (void)
+{
+	return NumberOfSentPackets > 2 ? NumberOfSentPackets - 2 : NumberOfSentPackets;
+}*/
+
 //reliability for one node or for all nodes in whole network? impossible with dummy nodes.
 //try whole net when testing max nr of control loops
 float NodeStatistics::GetPacketLoss (std::string trafficType)

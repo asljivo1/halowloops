@@ -2014,7 +2014,7 @@ int main(int argc, char *argv[]) {
 				cout << "downlink throughput Mbit/s " << dlThroughput << endl;*/
 
 		double throughput = (totalSuccessfulPackets + totalPacketsEchoed) * config.payloadSize * 8 / ((stats.EndApplicationTime.GetSeconds() - stats.TimeWhenEverySTAIsAssociated.GetSeconds()) * 1000000.0);
-		cout << "Time apps stoped=" << stats.EndApplicationTime.GetSeconds() << " s" << endl;
+		cout << "Time apps stopped=" << stats.EndApplicationTime.GetSeconds() << " s" << endl;
 		std::cout << "datarate" << "\t" << "throughput Kbit/s" << std::endl;
 		std::cout << config.datarate << "\t" << throughput * 1000 << " Kbit/s" << std::endl;
 	}

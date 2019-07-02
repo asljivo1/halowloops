@@ -3,7 +3,12 @@
 Statistics::Statistics() {
 	this->TimeWhenEverySTAIsAssociated = Time();
 	this->EndApplicationTime = Time ();
+	TimeMipStarted = Time ();
+	TimeMipEnded = Time ();
+	NumberOfIneasibleSolutions = 0;
+	NumberOfSolutions = 0;
 	this->TotalBeaconsSizeInBytes = 0;
+
 }
 
 Statistics::Statistics(int nrOfNodes) : Statistics::Statistics() {
