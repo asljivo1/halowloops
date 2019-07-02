@@ -61,7 +61,7 @@ namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("S1gRawCtr");
 
-//NS_OBJECT_ENSURE_REGISTERED (S1gRawCtr);
+
 
 Slot::Slot () : m_assignedAid(0), m_slotCount(0), m_slotStartTime(Time ()), m_slotDuration(Time ()), m_slotFormat (1), m_startAid (0), m_endAid (0)
 {}
@@ -331,6 +331,7 @@ S1gRawCtr::S1gRawCtr ()
 	//m_prevPrevRps = nullptr;
 	m_rps = new RPS;
 	m_startOptimalOpp = Time();
+	m_success = false;
 }
 
 S1gRawCtr::~S1gRawCtr ()
@@ -1377,7 +1378,10 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	try {
 		// Create an environment
 		GRBEnv env = GRBEnv();
-		env.set("LogFile", "./././rawOpt.log");
+
+		std::string pat = "./././results-coap/rawOptLog_n=" + std::to_string(n) + "_nSensors=" + std::to_string(sensorList.size()) + "_m=" + std::to_string(m) + "_BI=" + std::to_string(BeaconInterval) + "_tProcessingms=" + std::to_string(tProcessing.GetMilliSeconds()) + ".log";
+
+		env.set("LogFile", pat); // "./././results-coap/rawOpt.log"
 		env.start();
 
 		GRBVar w[m][n];
@@ -1402,13 +1406,25 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    MaxChannelTime = BeaconInterval - BeaconTxTimeMin; //us
 	    std::sort(criticalList.begin(), criticalList.end());
 
+	    std::fstream ostr;
+	    std::string path = "./optimization/optinfo_n=" + std::to_string(n) + "_nSensors=" + std::to_string(sensorList.size()) + "_m=" + std::to_string(m) + "_BI=" + std::to_string(BeaconInterval) + "_tProcessingms=" + std::to_string(tProcessing.GetMilliSeconds()) + ".log";
+	    ostr.open(path.c_str(), std::fstream::out | std::fstream::app);
+	    ostr << ">>Optimization started at "  << m_startOptimalOpp.GetNanoSeconds() << ", Now =" << Simulator::Now() << " ns." << std::endl;
+	    ostr << "INPUT INFORMATION" << std::endl;
+	    ostr << "BI = " << BeaconInterval << ", n = " << n << ", m = " << m << ", t^P_TX = " << tPacketTx << ", tProcessing=" << tProcessing.GetMicroSeconds() << std::endl;
+	    ostr << "prev RAW = " << std::endl;
+	    prevRps->Print(ostr);
+
+
 	    uint32_t scheduledUlTotal (0), numExectedPacketsTotal (0);
 	    std::map<uint16_t, bool> pagedAids, outsdandingAids;
 	    for (int h=0; h < criticalList.size(); h++)
 	    {
 	    	uint16_t aid = criticalList[h];
 	    	SensorActuator * sta = LookupCriticalSta (aid);
+	    	ostr << " STA #" << h << ", AID=" << aid << ", UL to be sent by next BI = " << sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets << ", outstanding DL = " << sta->m_numOutstandingDl;
 	    	scheduledUlTotal += sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets;
+	    	ostr << ", t_sent us = " << sta->m_tSent.GetMicroSeconds() << ", t_interval = " << sta->m_tInterval.GetMicroSeconds();
 	    	if (sta->m_numOutstandingDl)
 	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
 	    	else
@@ -1426,23 +1442,23 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    vname.str("");
 	    vname << "meff";
 	    meff = model.addVar(0.0, m, 0.0,  GRB_INTEGER, vname.str());
-	    /*vname.str("");
+	    vname.str("");
 	    vname << "a";
-	    a = model.addVar(ceil((14 + 8 * (65 + 6*m)) / 12.), 172., 0.0,  GRB_INTEGER, vname.str());*/
+	    a = model.addVar(87, ceil((14 + 8 * (65 + 1 + 63 + 8 + 6*m)) / 12.), 0.0,  GRB_INTEGER, vname.str());
 	    vname.str("");
 	    vname << "Tch";
-	    Tch = model.addVar(0.0, MaxChannelTime, 0.0,  GRB_CONTINUOUS, vname.str());
+	    Tch = model.addVar(0.0, MaxChannelTime, 0.0,  GRB_INTEGER, vname.str());
 	    for (int i = 0; i < m; i++)
 	    {
 	    	vname.str("");
 	    	vname << "c" << i;
-	    	c[i] = model.addVar(0.0, MaxChannelTime, 0.0,  GRB_CONTINUOUS, vname.str()); //upper bound= 246140.0 us in text
+	    	c[i] = model.addVar(0.0, MaxChannelTime, 0.0,  GRB_INTEGER, vname.str()); //upper bound= 246140.0 us in text
 	    	vname.str("");
 	    	vname << "tstart" << i;
-	    	tstart[i] = model.addVar(0.0, Simulator::Now().GetMicroSeconds() + BeaconInterval, 0.0,  GRB_CONTINUOUS, vname.str());
+	    	tstart[i] = model.addVar(0.0, Simulator::Now().GetMicroSeconds() + BeaconInterval, 0.0,  GRB_INTEGER, vname.str());
 	    	vname.str("");
 	    	vname << "tend" << i;
-	    	tend[i] = model.addVar(0.0, Simulator::Now().GetMicroSeconds() + BeaconInterval, 0.0,  GRB_CONTINUOUS, vname.str());
+	    	tend[i] = model.addVar(0.0, Simulator::Now().GetMicroSeconds() + BeaconInterval, 0.0,  GRB_INTEGER, vname.str());
 	    	vname.str("");
 	    	vname << "r" << i;
 	    	r[i] = model.addVar(0.0, 1.0, 0.0,  GRB_BINARY, vname.str());
@@ -1577,21 +1593,23 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    }
 	    uint32_t numTimPaged (allToPage.size() > 0 ? 1 : 0);
 	    uint32_t timSize (4 + numTimPaged * (1 + 2*31 + pagedSubblocks));
-	    //GRBLinExpr beaconSize = 27 + 26 + timSize + pageBitmapLen + 6 + 2 + 6 * meff;
-	    //GRBLinExpr ceilArg = (8 + 6 + 8 * beaconSize) / 12.;
-	    GRBLinExpr beaconTxDuration = 40 + 240 + 40 * ((14 + 8 * (65 + pageBitmapLen + numTimPaged * (63 + pagedSubblocks) + meff)) / 12) + 1000; //us
-	    /*vname.str("");
+	    GRBLinExpr beaconSize = 27 + 26 + timSize + pageBitmapLen + 6 + 2 + 6 * meff;
+	    GRBLinExpr ceilArg = (14 + 8 * beaconSize) / 12.;
+	    //GRBLinExpr beaconTxDuration = 40 + 240 + 40 * ((14 + 8 * (65 + pageBitmapLen + numTimPaged * (63 + pagedSubblocks) + meff)) / 12) + 1000; //us
+	    vname.str("");
 	    vname << "CON_51a.left";
 	    model.addConstr(ceilArg <= a, vname.str());
 	    vname.str("");
 	    vname << "CON_51a.right";
-	    model.addConstr(a <= ceilArg + 0.9999, vname.str());*/
+	    model.addConstr(a <= ceilArg + 0.9999, vname.str());
+
 	    vname.str("");
 	    vname << "CON_51";
-	    model.addConstr(Tch == BeaconInterval - beaconTxDuration, vname.str());
+	    model.addConstr(Tch == BeaconInterval - 240 - 40 * a, vname.str());
 
 
 	    // Constraint 52
+	    //GRBLinExpr Tch = BeaconInterval - beaconTxDuration;
 	    vname.str("");
 	    vname << "CON_52_";
 	    model.addConstr(Tch >= sumci, vname.str());
@@ -1663,25 +1681,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    		vname.str(""); vname << "CON_66_" << i << "." << h;
 	    		model.addQConstr(tend[i] * d[i][h] <= num + sta->m_tInterval.GetMicroSeconds() * s[i][h], vname.str());
 
-	    		// Constraint 68
-	    		uint8_t nRaw = prevRps->GetNumberOfRawGroups();
-	    		uint64_t startTime (0);
-	    		int g;
-	    		for (g = nRaw - 1; g >= 0; g--)
-	    		{
-	    			auto startaid = prevRps->GetRawAssigmentObj(g).GetRawGroupAIDStart();
-	    			auto endaid = prevRps->GetRawAssigmentObj(g).GetRawGroupAIDEnd();
-	    			if (startaid == aid)
-	    				break;
-	    		}
-	    		for (int l = 0; l < g; l++)
-	    		{
-	    			startTime += prevRps->GetRawAssigmentObj(l).GetSlotDuration().GetMicroSeconds() * prevRps->GetRawAssigmentObj(l).GetSlotNum();
-	    		}
-	    		startTime += Simulator::Now().GetMicroSeconds() - BeaconInterval; //TODO add previous beacon TX time
-	    		num = startTime + 2 * tPacketTx + tProcessing.GetMicroSeconds();
-	    		vname.str(""); vname << "CON_68_" << i << "." << h;
-	    		model.addQConstr(num * d[i][h] <= d[i][h] * tend[i], vname.str());
+
 	    	}
 	    	vname.str(""); vname << "CON_57_" << i;
 	    	model.addQConstr(tstart[i] >= expr57, vname.str());
@@ -1697,8 +1697,28 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    {
 	    	uint16_t aid = criticalList[h];
 	    	SensorActuator * sta = LookupCriticalSta (aid);
+	    	// Constraint 68
+	    	uint8_t nRaw = prevRps->GetNumberOfRawGroups();
+	    	uint64_t startTime (0);
+	    	int g;
+	    	for (g = nRaw - 1; g >= 0; g--)
+	    	{
+	    		auto startaid = prevRps->GetRawAssigmentObj(g).GetRawGroupAIDStart();
+	    		auto endaid = prevRps->GetRawAssigmentObj(g).GetRawGroupAIDEnd();
+	    		if (startaid <= aid && endaid >= aid)
+	    			break;
+	    	}
+	    	for (int l = 0; l < g; l++)
+	    	{
+	    		startTime += prevRps->GetRawAssigmentObj(l).GetSlotDuration().GetMicroSeconds() * prevRps->GetRawAssigmentObj(l).GetSlotNum();
+	    	}
+	    	startTime += Simulator::Now().GetMicroSeconds() - BeaconInterval; //TODO add previous beacon TX time
+	    	auto num = startTime + 2 * tPacketTx + tProcessing.GetMicroSeconds();
+	    	ostr << ", prevRawBiStartTime = " << startTime << std::endl;
 	    	for (int i = 0; i < m - 1; i++)
 	    	{
+	    		vname.str(""); vname << "CON_68_" << i << "." << h;
+	    		model.addQConstr(num * d[i][h] <= d[i][h] * tend[i], vname.str());
 	    		for (int j = i + 1; j < m; j++)
 	    		{
 	    			// Constraint 67
@@ -1727,25 +1747,27 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    			"because it is infeasible or unbounded" << std::endl;
 
 	    	// do IIS
-	    	std::cout << "The model is infeasible; computing IIS" << std::endl;
-	    	model.computeIIS();
-	    	std::cout << "\nThe following constraint(s) "
-	    			<< "cannot be satisfied:" << std::endl;
-	    	GRBConstr* constr = 0;
-	    	constr = model.getConstrs();
-	    	for (int i = 0; i < model.get(GRB_IntAttr_NumConstrs); ++i)
+	    	if (Simulator::Now() < Seconds (20))
 	    	{
-	    		if (constr[i].get(GRB_IntAttr_IISConstr) == 1)
+	    		model.computeIIS();
+	    		ostr << "\nThe following constraint(s) " << "cannot be satisfied:" << std::endl;
+	    		GRBConstr* constr = 0;
+	    		constr = model.getConstrs();
+	    		for (int i = 0; i < model.get(GRB_IntAttr_NumConstrs); ++i)
 	    		{
-	    			std::cout << constr[i].get(GRB_StringAttr_ConstrName) << std::endl;
+	    			if (constr[i].get(GRB_IntAttr_IISConstr) == 1)
+	    			{
+	    				ostr << constr[i].get(GRB_StringAttr_ConstrName) << std::endl;
+	    			}
 	    		}
+
 	    	}
-
-
+	    	ostr.close();
 	    	return false;
 	    }
 	    if (status != GRB_OPTIMAL) {
-	    	std::cout << "Optimization was stopped with status " << status << std::endl;
+	    	ostr << "Optimization was stopped with status " << status << std::endl;
+	    	ostr.close();
 	    	return false;
 	    }
 
@@ -1755,7 +1777,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    int num = currentId + 1;
 	    std::string fname = outputpath + "res_" + std::to_string(num) + ".txt";
 	    os.open(fname.c_str(), std::ios::out | std::ios::trunc);
-	    os << "Optimization started at " << m_startOptimalOpp.GetNanoSeconds() << " ns." << std::endl;
+	    os << "Optimization started at " << m_startOptimalOpp.GetNanoSeconds() << ", Now =" << Simulator::Now() << " ns." << std::endl;
 	    os << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
 
 	    for (int i = 0; i < m; i++)
@@ -1770,8 +1792,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	os << std::endl;
 	    }
 	    os << std::endl;
-	    os << Tch.get(GRB_StringAttr_VarName) << " = " << Tch.get(GRB_DoubleAttr_X) << std::endl;
-	    os << meff.get(GRB_StringAttr_VarName) << " = " << Tch.get(GRB_DoubleAttr_X) << std::endl;
+	    //os << Tch.get(GRB_StringAttr_VarName) << " = " << Tch.get(GRB_DoubleAttr_X) << std::endl;
+	    os << meff.get(GRB_StringAttr_VarName) << " = " << meff.get(GRB_DoubleAttr_X) << std::endl;
 	    os.close();
 
 
@@ -1897,6 +1919,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 
 	    }
 	    EncodeRaws (slots);
+	    ostr << "Transmission of beacon will take = " << this->GetBeaconTxDuration(criticalList).GetMicroSeconds() << " us" << std::endl;
+	    ostr.close();
 	    return true;
 	  } catch(GRBException e) {
 		  std::cout << "Error code = " << e.getErrorCode() << std::endl;
@@ -2072,10 +2096,10 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     		 //DistributeStationsToRaws ();
     		 std::cout << std::endl << std::endl;
     		 Time startTime = Simulator::Now();
-    		 bool success = OptimizeRaw(criticalList, sensorList, 10, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath);
-    		 if (!success)
+    		 m_success = OptimizeRaw(criticalList, sensorList, 32, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath);
+    		 if (!m_success)
     			 DistributeStationsToRaws ();
-    		 NS_LOG_UNCOND ("Start time=" << startTime << "End time=" << Simulator::Now());
+    		 //NS_LOG_UNCOND ("Start time=" << startTime << "End time=" << Simulator::Now());
     	 }
      //}
      currentId++; //beaconInterval counter

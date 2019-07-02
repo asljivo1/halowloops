@@ -62,99 +62,114 @@ NS_OBJECT_ENSURE_REGISTERED(ApWifiMac);
 
 TypeId ApWifiMac::GetTypeId(void) {
 	static TypeId tid =
-			TypeId("ns3::ApWifiMac").SetParent<RegularWifiMac>().SetGroupName(
-					"Wifi").AddConstructor<ApWifiMac>().AddAttribute(
+			TypeId("ns3::ApWifiMac")
+			.SetParent<RegularWifiMac>()
+			.SetGroupName("Wifi")
+			.AddConstructor<ApWifiMac>()
+			.AddAttribute(
 							"BeaconInterval", "Delay between two beacons",
 							TimeValue(MicroSeconds(102400)),
 							MakeTimeAccessor(&ApWifiMac::GetBeaconInterval,
-									&ApWifiMac::SetBeaconInterval), MakeTimeChecker()).AddAttribute(
-											"BeaconJitter",
-											"A uniform random variable to cause the initial beacon starting time (after simulation time 0) "
-											"to be distributed between 0 and the BeaconInterval.",
-											StringValue("ns3::UniformRandomVariable"),
-											MakePointerAccessor(&ApWifiMac::m_beaconJitter),
-											MakePointerChecker<UniformRandomVariable>()).AddAttribute(
-													"Outputpath",
-													"output path to store info of sensors and offload stations",
-													StringValue("stationfile"),
-													MakeStringAccessor(&ApWifiMac::m_outputpath),
-													MakeStringChecker()).AddAttribute("EnableBeaconJitter",
-															"If beacons are enabled, whether to jitter the initial send event.",
-															BooleanValue(false),
-															MakeBooleanAccessor(&ApWifiMac::m_enableBeaconJitter),
-															MakeBooleanChecker()).AddAttribute("BeaconGeneration",
-																	"Whether or not beacons are generated.", BooleanValue(true),
-																	MakeBooleanAccessor(&ApWifiMac::SetBeaconGeneration,
-																			&ApWifiMac::GetBeaconGeneration),
-																			MakeBooleanChecker()).AddAttribute("ChannelWidth",
-																					"Channel width of the stations ", UintegerValue(0),
-																					MakeUintegerAccessor(&ApWifiMac::GetChannelWidth,
-																							&ApWifiMac::SetChannelWidth),
-																							MakeUintegerChecker<uint32_t>()).AddAttribute(
-																									"NRawGroupStas", "Number of stations in one Raw Group",
-																									UintegerValue(6000),
-																									MakeUintegerAccessor(&ApWifiMac::GetRawGroupInterval,
-																											&ApWifiMac::SetRawGroupInterval),
-																											MakeUintegerChecker<uint32_t>()).AddAttribute(
-																													"NRawStations", "Number of total stations support RAW",
-																													UintegerValue(100),
-																													MakeUintegerAccessor(&ApWifiMac::GetTotalStaNum,
-																															&ApWifiMac::SetTotalStaNum),
-																															MakeUintegerChecker<uint32_t>()).AddAttribute("SlotFormat",
-																																	"Slot format", UintegerValue(1),
-																																	MakeUintegerAccessor(&ApWifiMac::GetSlotFormat,
-																																			&ApWifiMac::SetSlotFormat),
-																																			MakeUintegerChecker<uint32_t>()).AddAttribute(
-																																					"SlotCrossBoundary", "cross slot boundary or not",
-																																					UintegerValue(1),
-																																					MakeUintegerAccessor(&ApWifiMac::GetSlotCrossBoundary,
-																																							&ApWifiMac::SetSlotCrossBoundary),
-																																							MakeUintegerChecker<uint32_t>()).AddAttribute(
-																																									"SlotDurationCount", "slot duration count",
-																																									UintegerValue(1000),
-																																									MakeUintegerAccessor(&ApWifiMac::GetSlotDurationCount,
-																																											&ApWifiMac::SetSlotDurationCount),
-																																											MakeUintegerChecker<uint32_t>()).AddAttribute("SlotNum",
-																																													"Number of slot", UintegerValue(2),
-																																													MakeUintegerAccessor(&ApWifiMac::GetSlotNum,
-																																															&ApWifiMac::SetSlotNum),
-																																															MakeUintegerChecker<uint32_t>()).AddAttribute("RPSsetup",
-																																																	"configuration of RAW", RPSVectorValue(),
-																																																	MakeRPSVectorAccessor(&ApWifiMac::m_rpsset),
-																																																	MakeRPSVectorChecker()).AddTraceSource(
-																																																			"S1gBeaconBroadcasted",
-																																																			"Fired when a beacon is transmitted",
-																																																			MakeTraceSourceAccessor(&ApWifiMac::m_transmitBeaconTrace),
-																																																			"ns3::ApWifiMac::S1gBeaconTracedCallback").AddTraceSource(
-																																																					"RpsIndex", "Fired when RPS index changes",
-																																																					MakeTraceSourceAccessor(&ApWifiMac::m_rpsIndexTrace),
-																																																					"ns3::TracedValueCallback::Uint16").AddTraceSource(
-																																																							"RawGroup", "Fired when RAW group index changes",
-																																																							MakeTraceSourceAccessor(&ApWifiMac::m_rawGroupTrace),
-																																																							"ns3::TracedValueCallback::Uint8").AddTraceSource("RawSlot",
-																																																									"Fired when RAW slot index changes",
-																																																									MakeTraceSourceAccessor(&ApWifiMac::m_rawSlotTrace),
-																																																									"ns3::TracedValueCallback::Uint8")
-																																																									/*.AddTraceSource("RAWSlotStarted",
-			 "Fired when a RAW slot has started",
-			 MakeTraceSourceAccessor(&ApWifiMac::m_rawSlotStarted),
-			 "ns3::S1gApWifiMac::RawSlotStartedCallback")*/
-																																																									.AddTraceSource("PacketToTransmitReceivedFromUpperLayer",
-																																																											"Fired when packet is received from the upper layer",
-																																																											MakeTraceSourceAccessor(
-																																																													&ApWifiMac::m_packetToTransmitReceivedFromUpperLayer),
-																																																													"ns3::S1gApWifiMac::PacketToTransmitReceivedFromUpperLayerCallback").AddAttribute(
-																																																															"PageSliceSet", "configuration of PageSlice",
-																																																															pageSliceValue(),
-																																																															MakepageSliceAccessor(&ApWifiMac::m_pageslice),
-																																																															MakepageSliceChecker()).AddAttribute("PageSlicingActivated",
-																																																																	"Whether or not page slicing is activated.",
-																																																																	BooleanValue(true),
-																																																																	MakeBooleanAccessor(&ApWifiMac::SetPageSlicingActivated,
-																																																																			&ApWifiMac::GetPageSlicingActivated),
-																																																																			MakeBooleanChecker()).AddAttribute("TIMSet",
-																																																																					"configuration of TIM", TIMValue(),
-																																																																					MakeTIMAccessor(&ApWifiMac::m_TIM), MakeTIMChecker());
+									&ApWifiMac::SetBeaconInterval), MakeTimeChecker())
+			.AddAttribute("BeaconJitter",
+						"A uniform random variable to cause the initial beacon starting time (after simulation time 0) "
+						"to be distributed between 0 and the BeaconInterval.",
+						StringValue("ns3::UniformRandomVariable"),
+						MakePointerAccessor(&ApWifiMac::m_beaconJitter),
+						MakePointerChecker<UniformRandomVariable>())
+			.AddAttribute("Outputpath",
+						"output path to store info of sensors and offload stations",
+						StringValue("stationfile"),
+						MakeStringAccessor(&ApWifiMac::m_outputpath),
+						MakeStringChecker())
+			.AddAttribute("EnableBeaconJitter",
+						"If beacons are enabled, whether to jitter the initial send event.",
+						BooleanValue(false),
+						MakeBooleanAccessor(&ApWifiMac::m_enableBeaconJitter),
+						MakeBooleanChecker())
+			.AddAttribute("BeaconGeneration",
+						"Whether or not beacons are generated.", BooleanValue(true),
+						MakeBooleanAccessor(&ApWifiMac::SetBeaconGeneration,
+						&ApWifiMac::GetBeaconGeneration),
+						MakeBooleanChecker())
+						.AddAttribute("ChannelWidth",
+						"Channel width of the stations ", UintegerValue(0),
+						MakeUintegerAccessor(&ApWifiMac::GetChannelWidth,
+						&ApWifiMac::SetChannelWidth),
+						MakeUintegerChecker<uint32_t>())
+			.AddAttribute("NRawGroupStas", "Number of stations in one Raw Group",
+						UintegerValue(6000),
+						MakeUintegerAccessor(&ApWifiMac::GetRawGroupInterval,
+						&ApWifiMac::SetRawGroupInterval),
+						MakeUintegerChecker<uint32_t>())
+			.AddAttribute("NRawStations", "Number of total stations support RAW",
+						UintegerValue(100),
+						MakeUintegerAccessor(&ApWifiMac::GetTotalStaNum,
+						&ApWifiMac::SetTotalStaNum),
+						MakeUintegerChecker<uint32_t>())
+			.AddAttribute("SlotFormat",
+						"Slot format", UintegerValue(1),
+						MakeUintegerAccessor(&ApWifiMac::GetSlotFormat,
+						&ApWifiMac::SetSlotFormat),
+						MakeUintegerChecker<uint32_t>())
+			.AddAttribute(
+						"SlotCrossBoundary", "cross slot boundary or not",
+						UintegerValue(1),
+						MakeUintegerAccessor(&ApWifiMac::GetSlotCrossBoundary,
+						&ApWifiMac::SetSlotCrossBoundary),
+						MakeUintegerChecker<uint32_t>())
+			.AddAttribute(
+						"SlotDurationCount", "slot duration count",
+						UintegerValue(1000),
+						MakeUintegerAccessor(&ApWifiMac::GetSlotDurationCount,
+						&ApWifiMac::SetSlotDurationCount),
+						MakeUintegerChecker<uint32_t>())
+			.AddAttribute("SlotNum",
+						"Number of slot", UintegerValue(2),
+						MakeUintegerAccessor(&ApWifiMac::GetSlotNum,
+						&ApWifiMac::SetSlotNum),
+						MakeUintegerChecker<uint32_t>())
+			.AddAttribute("RPSsetup",
+						"configuration of RAW", RPSVectorValue(),
+						MakeRPSVectorAccessor(&ApWifiMac::m_rpsset),
+						MakeRPSVectorChecker())
+			.AddTraceSource(
+						"S1gBeaconBroadcasted",
+						"Fired when a beacon is transmitted",
+						MakeTraceSourceAccessor(&ApWifiMac::m_transmitBeaconTrace),
+						"ns3::ApWifiMac::S1gBeaconTracedCallback")
+			.AddTraceSource(
+						"RpsIndex", "Fired when RPS index changes",
+						MakeTraceSourceAccessor(&ApWifiMac::m_rpsIndexTrace),
+						"ns3::TracedValueCallback::Uint16")
+			.AddTraceSource(
+						"RawGroup", "Fired when RAW group index changes",
+						MakeTraceSourceAccessor(&ApWifiMac::m_rawGroupTrace),
+						"ns3::TracedValueCallback::Uint8")
+			.AddTraceSource("RawSlot",
+						"Fired when RAW slot index changes",
+						MakeTraceSourceAccessor(&ApWifiMac::m_rawSlotTrace),
+						"ns3::TracedValueCallback::Uint8")
+
+			.AddTraceSource("PacketToTransmitReceivedFromUpperLayer",
+						"Fired when packet is received from the upper layer",
+						MakeTraceSourceAccessor(
+						&ApWifiMac::m_packetToTransmitReceivedFromUpperLayer),
+						"ns3::S1gApWifiMac::PacketToTransmitReceivedFromUpperLayerCallback")
+			.AddAttribute(
+						"PageSliceSet", "configuration of PageSlice",
+						pageSliceValue(),
+						MakepageSliceAccessor(&ApWifiMac::m_pageslice),
+						MakepageSliceChecker())
+			.AddAttribute("PageSlicingActivated",
+						"Whether or not page slicing is activated.",
+						BooleanValue(true),
+						MakeBooleanAccessor(&ApWifiMac::SetPageSlicingActivated,
+						&ApWifiMac::GetPageSlicingActivated),
+						MakeBooleanChecker())
+			.AddAttribute("TIMSet",
+						"configuration of TIM", TIMValue(),
+						MakeTIMAccessor(&ApWifiMac::m_TIM), MakeTIMChecker());
 	/*
 	 .AddAttribute ("DTIMPeriod", "TIM number in one of DTIM",
 	 UintegerValue (4),

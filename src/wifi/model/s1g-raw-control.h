@@ -285,7 +285,7 @@ public:
     std::vector<uint16_t> m_lastTransmissionList;
     
     Time m_startOptimalOpp;
-
+    bool m_success;
 private:
     
 	std::vector <Time> m_t_succ;
