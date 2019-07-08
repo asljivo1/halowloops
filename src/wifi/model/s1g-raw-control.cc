@@ -1734,6 +1734,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    model.write("OptRaw_c++.lp");
 
 	    // Optimize model
+	    std::cout << "--------------Time = " << Simulator::Now().GetSeconds() << " s, out of " << simulationTime.GetSeconds() << std::endl;
 	    model.optimize();
 
 	    // Status checking
@@ -2111,7 +2112,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      	{
      		NS_LOG_UNCOND ("startAID-endAID=" << (int)s.GetStartAid() << "-" << (int)s.GetEndAid() << "\t start time=" << s.GetSlotStartTime() << "\t duration=" << s.GetSlotDuration());
      	}*/
-     std::ofstream pom;
+     /*std::ofstream pom;
      std::string strr = "lastrps.txt";
      pom.open(strr.c_str(), std::ios::out | std::ios::trunc);
      m_rps->Print(pom);
@@ -2121,7 +2122,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      outputpath += std::to_string(currentId) + ".txt";
      os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
      m_rps->Print(os);
-     os.close();
+     os.close();*/
 
      m_aidList.clear();
      m_aidListPaged.clear();
