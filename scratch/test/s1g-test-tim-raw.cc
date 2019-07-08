@@ -673,7 +673,7 @@ void onChannelTransmission(Ptr<NetDevice> senderDevice, Ptr<Packet> packet) {
 	int rawGroup = currentRawGroup - 1;
 	int slotIndex = currentRawSlot - 1;
 	//cout << rpsIndex << "		" << rawGroup << "		" << slotIndex << "		" << endl;
-
+/*
 	uint64_t iSlot = slotIndex;
 	if (rpsIndex > 0)
 		for (int r = rpsIndex - 1; r >= 0; r--)
@@ -683,7 +683,7 @@ void onChannelTransmission(Ptr<NetDevice> senderDevice, Ptr<Packet> packet) {
 	if (rawGroup > 0)
 		for (int i = rawGroup - 1; i >= 0; i--)
 			iSlot += config.rps.rpsset[rpsIndex]->GetRawAssigmentObj(i).GetSlotNum();
-
+*/
 	// to calculate the throughput of beacons
 	WifiMacHeader hdr;
 	packet->PeekHeader(hdr);
