@@ -1588,10 +1588,10 @@ int main(int argc, char *argv[]) {
 	//LogComponentEnable ("UdpServer", LOG_LEVEL_INFO);
 	//LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
 	//LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
-	LogComponentEnable ("CoapClient", LOG_LEVEL_INFO);
-	LogComponentEnable ("CoapServer", LOG_LEVEL_INFO);
+	//LogComponentEnable ("CoapClient", LOG_LEVEL_INFO);
+	//LogComponentEnable ("CoapServer", LOG_LEVEL_INFO);
 
-	LogComponentEnable ("ApWifiMac", LOG_LEVEL_INFO);
+	//LogComponentEnable ("ApWifiMac", LOG_LEVEL_INFO);
 	//LogComponentEnable ("StaWifiMac", LOG_LEVEL_INFO);
 	//LogComponentEnable ("EdcaTxopN", LOG_LEVEL_DEBUG);
 	//LogComponentEnable ("MacLow", LOG_LEVEL_DEBUG);

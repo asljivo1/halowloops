@@ -1793,6 +1793,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    ostr << std::endl;
 	    //os << Tch.get(GRB_StringAttr_VarName) << " = " << Tch.get(GRB_DoubleAttr_X) << std::endl;
 	    ostr << meff.get(GRB_StringAttr_VarName) << " = " << meff.get(GRB_DoubleAttr_X) << std::endl;
+	    ostr << Tch.get(GRB_StringAttr_VarName) << " = " << Tch.get(GRB_DoubleAttr_X) << std::endl;
 	    ostr.close();
 
 
