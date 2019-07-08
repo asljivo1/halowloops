@@ -326,7 +326,7 @@ void onSTAAssociated(int i) {
 		std::cout << "   " << aid;
 	std::cout << std::endl;
 
-
+/*
 	for (int k = 0; k < config.rps.rpsset.size(); k++) {
 		for (int j = 0; j < config.rps.rpsset[k]->GetNumberOfRawGroups(); j++) {
 			if (config.rps.rpsset[k]->GetRawAssigmentObj(j).GetRawGroupAIDStart()
@@ -339,13 +339,13 @@ void onSTAAssociated(int i) {
 						nodes[i]->aids[nodes[i]->aids.size() - 1]
 								% config.rps.rpsset[k]->GetRawAssigmentObj(j).GetSlotNum()
 								+ 1;
-				/*cout << "Node " << i << " with AID " << (int)nodes[i]->aId << " belongs to " << (int)nodes[i]->rawSlotIndex << " slot of RAW group "
-				 << (int)nodes[i]->rawGroupNumber << " within the " << (int)nodes[i]->rpsIndex << " RPS." << endl;
-				 */
+				//cout << "Node " << i << " with AID " << (int)nodes[i]->aId << " belongs to " << (int)nodes[i]->rawSlotIndex << " slot of RAW group "
+				 //<< (int)nodes[i]->rawGroupNumber << " within the " << (int)nodes[i]->rpsIndex << " RPS." << endl;
+
 			}
 		}
 	}
-
+*/
 	eventManager.onNodeAssociated(*nodes[i]);
 
 	// RPS, Raw group and RAW slot assignment
