@@ -374,6 +374,7 @@ private:
   Ptr<UniformRandomVariable> m_beaconJitter; //!< UniformRandomVariable used to randomize the time of the first beacon
   bool m_enableBeaconJitter;                 //!< Flag if the first beacon should be generated at random time
   std::string  m_outputpath;
+  Time m_simulationTime;
   bool m_pageSlicingActivated;
   Time m_lastBeaconTime;
   static uint16_t RpsIndex;

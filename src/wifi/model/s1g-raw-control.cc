@@ -1366,7 +1366,7 @@ S1gRawCtr::IsInfoAvailableForAllSta()
 
 //Second attempt
 bool
-S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath)
+S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath, Time simulationTime)
 {
 	if (!IsInfoAvailableForAllSta())
 	    	 return false;
@@ -1379,7 +1379,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 		// Create an environment
 		GRBEnv env = GRBEnv();
 
-		std::string pat = "./././results-coap/rawOptLog_n=" + std::to_string(n) + "_nSensors=" + std::to_string(sensorList.size()) + "_m=" + std::to_string(m) + "_BI=" + std::to_string(BeaconInterval) + "_tProcessingms=" + std::to_string(tProcessing.GetMilliSeconds()) + ".log";
+		std::string pat = "./././optimization/LogOpt_n=" + std::to_string(n) + "_nSensors=" + std::to_string(sensorList.size()) + "_m=" + std::to_string(m) + "_BI=" + std::to_string(BeaconInterval) + "_tProcessingms=" + std::to_string(tProcessing.GetMilliSeconds()) + "___" + outputpath + ".log";
 
 		env.set("LogFile", pat); // "./././results-coap/rawOpt.log"
 		env.start();
@@ -1407,7 +1407,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    std::sort(criticalList.begin(), criticalList.end());
 
 	    std::fstream ostr;
-	    std::string path = "./optimization/optinfo_n=" + std::to_string(n) + "_nSensors=" + std::to_string(sensorList.size()) + "_m=" + std::to_string(m) + "_BI=" + std::to_string(BeaconInterval) + "_tProcessingms=" + std::to_string(tProcessing.GetMilliSeconds()) + ".log";
+	    std::string path = "./optimization/OptInfo_n=" + std::to_string(n) + "_nSensors=" + std::to_string(sensorList.size()) + "_m=" + std::to_string(m) + "_BI=" + std::to_string(BeaconInterval) + "_tProcessingms=" + std::to_string(tProcessing.GetMilliSeconds()) + "___" + outputpath + ".log";
 	    ostr.open(path.c_str(), std::fstream::out | std::fstream::app);
 	    ostr << ">>Optimization started at "  << m_startOptimalOpp.GetNanoSeconds() << ", Now =" << Simulator::Now() << " ns." << std::endl;
 	    ostr << "INPUT INFORMATION" << std::endl;
@@ -1738,7 +1738,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 
 	    // Status checking
 	    int status = model.get(GRB_IntAttr_Status);
-
+	    ostr << "Optimization was stopped with status " << status << std::endl;
 	    if (status == GRB_INF_OR_UNBD ||
 	    		status == GRB_INFEASIBLE  ||
 	    		status == GRB_UNBOUNDED     )
@@ -1747,7 +1747,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    			"because it is infeasible or unbounded" << std::endl;
 
 	    	// do IIS
-	    	if (Simulator::Now() < Seconds (20))
+	    	if (Simulator::Now() < simulationTime)
 	    	{
 	    		model.computeIIS();
 	    		ostr << "\nThe following constraint(s) " << "cannot be satisfied:" << std::endl;
@@ -1766,35 +1766,34 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	return false;
 	    }
 	    if (status != GRB_OPTIMAL) {
-	    	ostr << "Optimization was stopped with status " << status << std::endl;
 	    	ostr.close();
 	    	return false;
 	    }
 
-
+/*
 	    std::ofstream os;
 	    std::string outputpath = "./optimization/";
 	    int num = currentId + 1;
 	    std::string fname = outputpath + "res_" + std::to_string(num) + ".txt";
 	    os.open(fname.c_str(), std::ios::out | std::ios::trunc);
-	    os << "Optimization started at " << m_startOptimalOpp.GetNanoSeconds() << ", Now =" << Simulator::Now() << " ns." << std::endl;
-	    os << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
+	    os << "Optimization started at " << m_startOptimalOpp.GetNanoSeconds() << ", Now =" << Simulator::Now() << " ns." << std::endl;*/
+	    ostr << "Obj: " << model.get(GRB_DoubleAttr_ObjVal) << std::endl;
 
 	    for (int i = 0; i < m; i++)
 	    {
-    		os << std::left << std::setw(13) << c[i].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << c[i].get(GRB_DoubleAttr_X);
+	    	ostr << std::left << std::setw(13) << c[i].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << c[i].get(GRB_DoubleAttr_X);
 	    	for (int h = 0; h < n; h++)
 	    	{
-	    		os << std::left << std::setw(6) << w[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << w[i][h].get(GRB_DoubleAttr_X);
-	    		os << std::left << std::setw(6) << u[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << u[i][h].get(GRB_DoubleAttr_X);
-	    		os << std::left << std::setw(6) << d[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << d[i][h].get(GRB_DoubleAttr_X);
+	    		ostr << std::left << std::setw(6) << w[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << w[i][h].get(GRB_DoubleAttr_X);
+	    		ostr << std::left << std::setw(6) << u[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << u[i][h].get(GRB_DoubleAttr_X);
+	    		ostr << std::left << std::setw(6) << d[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << d[i][h].get(GRB_DoubleAttr_X);
 	    	}
-	    	os << std::endl;
+	    	ostr << std::endl;
 	    }
-	    os << std::endl;
+	    ostr << std::endl;
 	    //os << Tch.get(GRB_StringAttr_VarName) << " = " << Tch.get(GRB_DoubleAttr_X) << std::endl;
-	    os << meff.get(GRB_StringAttr_VarName) << " = " << meff.get(GRB_DoubleAttr_X) << std::endl;
-	    os.close();
+	    ostr << meff.get(GRB_StringAttr_VarName) << " = " << meff.get(GRB_DoubleAttr_X) << std::endl;
+	    ostr.close();
 
 
 	    std::vector<Slot> slots;
@@ -1933,7 +1932,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 }
 // Beacon duration), before that use NGroup=1 and initialize by ap-wifi-mac
 RPS
-S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, std::map<uint16_t,uint16_t> numExpectedDlPacketsForAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath)
+S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, std::map<uint16_t,uint16_t> numExpectedDlPacketsForAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath, Time simulationTime)
  {
      NS_ASSERT ("S1gRawCtr should not be called");
      //gandalf ();
@@ -2096,7 +2095,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     		 //DistributeStationsToRaws ();
     		 std::cout << std::endl << std::endl;
     		 Time startTime = Simulator::Now();
-    		 m_success = OptimizeRaw(criticalList, sensorList, 32, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath);
+    		 m_success = OptimizeRaw(criticalList, sensorList, 32, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath, simulationTime);
     		 if (!m_success)
     			 DistributeStationsToRaws ();
     		 //NS_LOG_UNCOND ("Start time=" << startTime << "End time=" << Simulator::Now());

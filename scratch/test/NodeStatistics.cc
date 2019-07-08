@@ -65,7 +65,7 @@ float NodeStatistics::GetPacketLoss (std::string trafficType)
 		float pl;
 		if (NumberOfSuccessfulRoundtripPackets > 0) //loops
 		{
-			pl = (NumberOfSentPackets - NumberOfSuccessfulRoundtripPackets) / (float)(NumberOfSentPackets + NumberOfSuccessfulPackets);
+			pl = (NumberOfSentPackets - NumberOfSuccessfulRoundtripPackets - 2) / (float)(NumberOfSentPackets - 2 + NumberOfSuccessfulPackets);
 		}
 		else if (NumberOfSuccessfulPackets > 0) //uplink
 		{

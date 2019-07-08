@@ -82,6 +82,11 @@ TypeId ApWifiMac::GetTypeId(void) {
 						StringValue("stationfile"),
 						MakeStringAccessor(&ApWifiMac::m_outputpath),
 						MakeStringChecker())
+			.AddAttribute("SimulationTime",
+						"simulation duration after which do not compute IIS",
+						TimeValue(Seconds (30)),
+						MakeTimeAccessor(&ApWifiMac::m_simulationTime),
+						MakeTimeChecker())
 			.AddAttribute("EnableBeaconJitter",
 						"If beacons are enabled, whether to jitter the initial send event.",
 						BooleanValue(false),
@@ -1601,7 +1606,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		if (this->m_criticalAids.size()) //
 		{
 			RPS rps;
-			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, m_numExpectedDlPacketsForAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, path);
+			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, m_numExpectedDlPacketsForAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, this->m_outputpath, m_simulationTime);
 			m_aidsForcePage = m_S1gRawCtr.GetAidsToForcePage();
 			UpdateQueues(rps);
 			//clear RPS vector

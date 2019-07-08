@@ -5,7 +5,7 @@ rm OptRaw_c++.lp
 rm OptRaw_c++.mps
 rm optimization/*
 
-./waf --run "test --BeaconInterval=102400 --pagePeriod=1 --pageSliceLength=1 --pageSliceCount=0 --simulationTime=20 --payloadSize=64 --rho=100 --TrafficType=\"coap\" --PrintStats=true --RAWConfigFile=\"./OptimalRawGroup/RawConfig-10-4-1-102400-0-31.txt\"  --TrafficInterval=1000 --CycleTime=51200 --nControlLoops=1 --DataMode=\"MCS2_8\" --seed=10 --EnableVirtualAids=false --Nsta=10 --ProcessingDelay=5" -j4
+./waf --run "test --BeaconInterval=102400 --pagePeriod=1 --pageSliceLength=1 --pageSliceCount=0 --simulationTime=3 --payloadSize=64 --rho=100 --TrafficType=\"coap\" --PrintStats=true --RAWConfigFile=\"./OptimalRawGroup/RawConfig-10-4-1-102400-0-31.txt\"  --TrafficInterval=1000 --CycleTime=51200 --nControlLoops=1 --DataMode=\"MCS2_8\" --seed=10 --EnableVirtualAids=false --Nsta=10 --ProcessingDelay=5" -j4
 
 #./waf --run test --command-template=" gdb --args %s <args> --BeaconInterval=102400 --pagePeriod=1 --pageSliceLength=1 --pageSliceCount=0 --simulationTime=4 --payloadSize=64 --rho=100 --TrafficType=\"coap\" --PrintStats=true --RAWConfigFile=\"./OptimalRawGroup/RawConfig-10-4-1-102400-0-31.txt\"  --TrafficInterval=1000 --CycleTime=51200 --nControlLoops=1 --DataMode=\"MCS2_8\" --seed=10 --EnableVirtualAids=false --Nsta=10"
 

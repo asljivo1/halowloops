@@ -673,7 +673,7 @@ void onChannelTransmission(Ptr<NetDevice> senderDevice, Ptr<Packet> packet) {
 	int rawGroup = currentRawGroup - 1;
 	int slotIndex = currentRawSlot - 1;
 	//cout << rpsIndex << "		" << rawGroup << "		" << slotIndex << "		" << endl;
-/*
+
 	uint64_t iSlot = slotIndex;
 	if (rpsIndex > 0)
 		for (int r = rpsIndex - 1; r >= 0; r--)
@@ -695,19 +695,19 @@ void onChannelTransmission(Ptr<NetDevice> senderDevice, Ptr<Packet> packet) {
 		if (senderDevice->GetAddress() == apDevice.Get(0)->GetAddress())
 		{
 			// from AP
-			transmissionsPerTIMGroupAndSlotFromAPSinceLastInterval[iSlot] += packet->GetSerializedSize();
+			//transmissionsPerTIMGroupAndSlotFromAPSinceLastInterval[iSlot] += packet->GetSerializedSize();
 		}
 		else
 		{
 			// from STA
-			transmissionsPerTIMGroupAndSlotFromSTASinceLastInterval[iSlot] += packet->GetSerializedSize();
+			//transmissionsPerTIMGroupAndSlotFromSTASinceLastInterval[iSlot] += packet->GetSerializedSize();
 
 		}
 	}
 	//std::cout << "------------- packetSerializedSize = " << packet->GetSerializedSize() << std::endl;
 	//std::cout << "------------- txAP[" << iSlot <<"] = " << transmissionsPerTIMGroupAndSlotFromAPSinceLastInterval[iSlot] << std::endl;
 	//std::cout << "------------- txSTA[" << iSlot <<"] = " << transmissionsPerTIMGroupAndSlotFromSTASinceLastInterval[iSlot] << std::endl;
-*/
+
 }
 
 int getSTAIdFromAddress(Ipv4Address from) {
@@ -1307,7 +1307,7 @@ void printStatsToFile (bool print)
 	{
 		if (nodes[i]->m_nodeType == NodeEntry::CLIENT)
 		{
-			clTotalSentPackets += stats.get(i).NumberOfSentPackets;
+			clTotalSentPackets += stats.get(i).NumberOfSentPackets > 2 ? stats.get(i).NumberOfSentPackets - 2 : stats.get(i).NumberOfSentPackets;
 			clTotalDeliveredPackets += stats.get(i).NumberOfSuccessfulPackets;
 			clTotalRtPackets += stats.get(i).NumberOfSuccessfulRoundtripPackets;
 			clTotalDuplicates += stats.get(i).NumberOfDuplicatesAtClient + stats.get(i).NumberOfDuplicatesAtServer;
@@ -1356,7 +1356,7 @@ void printStatsToFile (bool print)
 			os << "Total transmit time=" << std::to_string(stats.get(i).TotalTransmitTime.GetMilliSeconds()) << "ms" << endl;
 			os << "Total receive time=" << std::to_string(stats.get(i).TotalReceiveTime.GetMilliSeconds()) << "ms" << endl;
 			os << "ConsumedEnergy=" << stats.get(i).GetTotalEnergyConsumption() << " mJ\n";
-			os << "Number of packets sent=" << std::to_string(stats.get(i).NumberOfSentPackets) << endl; // CORRECT
+			os << "Number of packets sent=" << std::to_string(stats.get(i).NumberOfSentPackets > 2 ? stats.get(i).NumberOfSentPackets - 2 : stats.get(i).NumberOfSentPackets) << endl; // CORRECT
 			os << "Number of packets successfuly arrived to the dst=" << std::to_string(stats.get(i).NumberOfSuccessfulPackets) << endl; //CORRECT
 			os << "Number of packets dropped=" << std::to_string(stats.get(i).getNumberOfDroppedPackets()) << endl; // NOT CORRECT
 			os << "Number of roundtrip packets successful=" << std::to_string(stats.get(i).NumberOfSuccessfulRoundtripPackets) << endl; //CORRECT
@@ -1718,7 +1718,9 @@ int main(int argc, char *argv[]) {
 	                 "NRawStations", UintegerValue (config.Nsta),
 	                 "RPSsetup", RPSVectorValue (config.rps),
 	                 "PageSliceSet", pageSliceValue (config.pageS),
-	                 "TIMSet", TIMValue (config.tim)
+	                 "TIMSet", TIMValue (config.tim),
+	                 "Outputpath", StringValue(config.NSSFile),
+	                 "SimulationTime", TimeValue (Seconds (config.simulationTime))
 	               );
 
 	phy.Set("TxGain", DoubleValue(3.0));
@@ -2029,7 +2031,7 @@ int main(int argc, char *argv[]) {
 	timeTx = timeTx / config.Nsta;
 	timeSleep = timeSleep / config.Nsta;
 
-
+/*
 	ofstream risultati;
 	//string addressresults = Outputpath + "/moreinfo.txt";
 	string addressresults = config.OutputPath + "moreinfo.txt";
@@ -2055,18 +2057,18 @@ int main(int argc, char *argv[]) {
 
 		totenergycons = 0;
 
-		/*
+
 		 cout << "================== Sleep " << stats.get(i).TotalSleepTime.GetSeconds() << endl;
 		 cout << "================== Tx " << stats.get(i).TotalTxTime.GetSeconds() << endl;
 		 cout << "================== Rx " << stats.get(i).TotalRxTime.GetSeconds() << endl;
 		 cout << "+++++++++++++++++++IDLE " << stats.get(i).TotalIdleTime.GetSeconds() << endl;
 		 cout << "ooooooooooooooooooo TOTENERGY " <<  stats.get(i).GetTotalEnergyConsumption() << " mW" << endl;
 		 cout << "Rx+Idle ENERGY " <<  stats.get(i).EnergyRxIdle << " mW" << endl;
-		 cout << "Tx ENERGY " <<  stats.get(i).EnergyTx << " mW" << endl;*/
+		 cout << "Tx ENERGY " <<  stats.get(i).EnergyTx << " mW" << endl;
 
 		i++;
 	}
 
-	risultati.close();
+	risultati.close();*/
 	return 0;
 }
