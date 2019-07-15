@@ -1416,7 +1416,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    prevRps->Print(ostr);
 
 
-	    uint32_t scheduledUlTotal (0), numExectedPacketsTotal (0);
+	    uint32_t scheduledUlTotal (0), leqNumPackets (0), geqNumPackets (0);
 	    std::map<uint16_t, bool> pagedAids, outsdandingAids;
 	    for (int h=0; h < criticalList.size(); h++)
 	    {
@@ -1425,7 +1425,9 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	ostr << " STA #" << h << ", AID=" << aid << ", UL to be sent by next BI = " << sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets
 	    			<< ", outstanding DL = " << sta->m_numOutstandingDl << ", m_pendingDownlinkPackets = " << sta->m_pendingDownlinkPackets << ", m_paged = "
 	    			<< sta->m_paged << ", DT BI-tSENT = " << Simulator::Now().GetMicroSeconds() - sta->m_tSent.GetMicroSeconds();
-	    	scheduledUlTotal += sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets;
+	    	int ulPacketsh = sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets;
+	    	scheduledUlTotal += ulPacketsh;
+	    	geqNumPackets += 2 * (ulPacketsh - std::ceil(ulPacketsh * 1.0 / (ulPacketsh + 1.0)));
 	    	ostr << ", t_sent us = " << sta->m_tSent.GetMicroSeconds() << ", t_interval = " << sta->m_tInterval.GetMicroSeconds();
 	    	if (sta->m_numOutstandingDl || sta->m_pendingDownlinkPackets)
 	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
@@ -1437,9 +1439,10 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 1));
 	    	else
 	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 0));
-	    	numExectedPacketsTotal += (uint32_t)pagedAids.find(h)->second; //+ (uint32_t)outsdandingAids.find(h)->second;
+	    	leqNumPackets += (uint32_t)pagedAids.find(h)->second; //+ (uint32_t)outsdandingAids.find(h)->second;
+	    	geqNumPackets += (uint32_t)pagedAids.find(h)->second;
 	    }
-	    numExectedPacketsTotal += 2 * scheduledUlTotal;
+	    leqNumPackets += 2 * scheduledUlTotal;
 	    std::ostringstream vname;
 	    vname.str("");
 	    vname << "meff";
@@ -1572,12 +1575,13 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    // Constraint 47
 	    vname.str("");
 	    vname << "CON_47_";
-	    model.addConstr(sumwih <= numExectedPacketsTotal, vname.str());
+	    model.addConstr(sumwih <= leqNumPackets, vname.str());
 	    // Constraint 48
 	    vname.str("");
 	    vname << "CON_48_";
-	    model.addConstr(sumwih >= 2 * scheduledUlTotal - std::count_if(pagedAids.begin(), pagedAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;}) -
-	    		2 * std::count_if(outsdandingAids.begin(), outsdandingAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;}), vname.str()); //2 * scheduledUlTotal
+	    model.addConstr(sumwih >= geqNumPackets
+	    		//2 * scheduledUlTotal + 2 * std::count_if(outsdandingAids.begin(), outsdandingAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;}) - 2 - std::count_if(pagedAids.begin(), pagedAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;})
+	    		, vname.str()); //2 * scheduledUlTotal
 	    // Constraint 50
 	    vname.str("");
 	    vname << "CON_50_";
