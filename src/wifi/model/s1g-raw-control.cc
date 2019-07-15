@@ -2100,7 +2100,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     		 //DistributeStationsToRaws ();
     		 std::cout << std::endl << std::endl;
     		 Time startTime = Simulator::Now();
-    		 m_success = OptimizeRaw(criticalList, sensorList, 16, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath, simulationTime);
+    		 m_success = OptimizeRaw(criticalList, sensorList, 32, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath, simulationTime);
 
 
     		 if (!m_success)
