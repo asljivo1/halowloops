@@ -1281,7 +1281,7 @@ EdcaTxopN::RawStart ()
 
   nrOfTransmissionsDuringRaw = 0;
   StartAccessIfNeededRaw (); //access could start even no packet
-  //RestartAccessIfNeeded();
+  RestartAccessIfNeeded();
 
 }
 

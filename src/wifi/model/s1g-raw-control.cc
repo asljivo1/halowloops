@@ -1422,10 +1422,12 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    {
 	    	uint16_t aid = criticalList[h];
 	    	SensorActuator * sta = LookupCriticalSta (aid);
-	    	ostr << " STA #" << h << ", AID=" << aid << ", UL to be sent by next BI = " << sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets << ", outstanding DL = " << sta->m_numOutstandingDl;
+	    	ostr << " STA #" << h << ", AID=" << aid << ", UL to be sent by next BI = " << sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets
+	    			<< ", outstanding DL = " << sta->m_numOutstandingDl << ", m_pendingDownlinkPackets = " << sta->m_pendingDownlinkPackets << ", m_paged = "
+	    			<< sta->m_paged << ", DT BI-tSENT = " << Simulator::Now().GetMicroSeconds() - sta->m_tSent.GetMicroSeconds();
 	    	scheduledUlTotal += sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets;
 	    	ostr << ", t_sent us = " << sta->m_tSent.GetMicroSeconds() << ", t_interval = " << sta->m_tInterval.GetMicroSeconds();
-	    	if (sta->m_numOutstandingDl)
+	    	if (sta->m_numOutstandingDl || sta->m_pendingDownlinkPackets)
 	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
 	    	else
 	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 0));
@@ -1435,7 +1437,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 1));
 	    	else
 	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 0));
-	    	numExectedPacketsTotal += (uint32_t)pagedAids.find(h)->second + (uint32_t)outsdandingAids.find(h)->second;
+	    	numExectedPacketsTotal += (uint32_t)pagedAids.find(h)->second; //+ (uint32_t)outsdandingAids.find(h)->second;
 	    }
 	    numExectedPacketsTotal += 2 * scheduledUlTotal;
 	    std::ostringstream vname;
@@ -1455,10 +1457,10 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	c[i] = model.addVar(0.0, MaxChannelTime, 0.0,  GRB_INTEGER, vname.str()); //upper bound= 246140.0 us in text
 	    	vname.str("");
 	    	vname << "tstart" << i;
-	    	tstart[i] = model.addVar(0.0, Simulator::Now().GetMicroSeconds() + BeaconInterval, 0.0,  GRB_INTEGER, vname.str());
+	    	tstart[i] = model.addVar(Simulator::Now().GetMicroSeconds(), Simulator::Now().GetMicroSeconds() + BeaconInterval, 0.0,  GRB_INTEGER, vname.str());
 	    	vname.str("");
 	    	vname << "tend" << i;
-	    	tend[i] = model.addVar(0.0, Simulator::Now().GetMicroSeconds() + BeaconInterval, 0.0,  GRB_INTEGER, vname.str());
+	    	tend[i] = model.addVar(Simulator::Now().GetMicroSeconds(), Simulator::Now().GetMicroSeconds() + BeaconInterval, 0.0,  GRB_INTEGER, vname.str());
 	    	vname.str("");
 	    	vname << "r" << i;
 	    	r[i] = model.addVar(0.0, 1.0, 0.0,  GRB_BINARY, vname.str());
@@ -1574,7 +1576,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    // Constraint 48
 	    vname.str("");
 	    vname << "CON_48_";
-	    model.addConstr(sumwih >= 2 * scheduledUlTotal, vname.str());
+	    model.addConstr(sumwih >= 2 * scheduledUlTotal - std::count_if(pagedAids.begin(), pagedAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;}) -
+	    		2 * std::count_if(outsdandingAids.begin(), outsdandingAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;}), vname.str()); //2 * scheduledUlTotal
 	    // Constraint 50
 	    vname.str("");
 	    vname << "CON_50_";
@@ -1623,7 +1626,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	// Constraint 53
 	    	vname.str("");
 	    	vname << "CON_53_" << i;
-	    	model.addConstr(tstart[i] == sumcUptoi, vname.str());
+	    	model.addConstr(tstart[i] == sumcUptoi + BeaconInterval - Tch, vname.str());
 	    	// Constraint 54
 	    	vname.str("");
 	    	vname << "CON_54_" << i;
@@ -1631,7 +1634,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	// Constraint 55
 	    	vname.str("");
 	    	vname << "CON_55_" << i;
-	    	model.addConstr(tstart[i] >= Simulator::Now().GetMicroSeconds(), vname.str());
+	    	model.addConstr(tstart[i] >= Simulator::Now().GetMicroSeconds() + BeaconInterval - Tch, vname.str());
 	    	// Constraint 56
 	    	vname.str("");
 	    	vname << "CON_56_" << i;
@@ -1639,7 +1642,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	// Constraint 59
 	    	vname.str("");
 	    	vname << "CON_59_" << i;
-	    	model.addConstr(tend[i] >= Simulator::Now().GetMicroSeconds(), vname.str());
+	    	model.addConstr(tend[i] >= Simulator::Now().GetMicroSeconds() + BeaconInterval - Tch, vname.str());
 	    	// Constraint 60
 	    	vname.str("");
 	    	vname << "CON_60_" << i;
@@ -1712,9 +1715,9 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	{
 	    		startTime += prevRps->GetRawAssigmentObj(l).GetSlotDuration().GetMicroSeconds() * prevRps->GetRawAssigmentObj(l).GetSlotNum();
 	    	}
-	    	startTime += Simulator::Now().GetMicroSeconds() - BeaconInterval; //TODO add previous beacon TX time
+	    	startTime += Simulator::Now().GetMicroSeconds() - BeaconInterval + m_prevBeaconTxDuration.GetMicroSeconds(); //TODO add previous beacon TX time
 	    	auto num = startTime + 2 * tPacketTx + tProcessing.GetMicroSeconds();
-	    	ostr << ", prevRawBiStartTime = " << startTime << std::endl;
+	    	ostr << ", prevRawBiStartTime = " << startTime << ", m_prevBeaconTxDuration = " << m_prevBeaconTxDuration.GetMicroSeconds() << std::endl;
 	    	for (int i = 0; i < m - 1; i++)
 	    	{
 	    		vname.str(""); vname << "CON_68_" << i << "." << h;
@@ -1748,7 +1751,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    			"because it is infeasible or unbounded" << std::endl;
 
 	    	// do IIS
-	    	/*if (Simulator::Now() < simulationTime)
+	    	/*if (Simulator::Now() < simulationTime + Seconds (2))
 	    	{
 	    		model.computeIIS();
 	    		ostr << "\nThe following constraint(s) " << "cannot be satisfied:" << std::endl;
@@ -2097,7 +2100,9 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     		 //DistributeStationsToRaws ();
     		 std::cout << std::endl << std::endl;
     		 Time startTime = Simulator::Now();
-    		 m_success = OptimizeRaw(criticalList, sensorList, 32, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath, simulationTime);
+    		 m_success = OptimizeRaw(criticalList, sensorList, 16, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath, simulationTime);
+
+
     		 if (!m_success)
     			 DistributeStationsToRaws ();
     		 //NS_LOG_UNCOND ("Start time=" << startTime << "End time=" << Simulator::Now());
@@ -2112,17 +2117,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
      	{
      		NS_LOG_UNCOND ("startAID-endAID=" << (int)s.GetStartAid() << "-" << (int)s.GetEndAid() << "\t start time=" << s.GetSlotStartTime() << "\t duration=" << s.GetSlotDuration());
      	}*/
-     /*std::ofstream pom;
-     std::string strr = "lastrps.txt";
-     pom.open(strr.c_str(), std::ios::out | std::ios::trunc);
-     m_rps->Print(pom);
-     pom.close();
 
-     std::ofstream os;
-     outputpath += std::to_string(currentId) + ".txt";
-     os.open(outputpath.c_str(), std::ios::out | std::ios::trunc);
-     m_rps->Print(os);
-     os.close();*/
 
      m_aidList.clear();
      m_aidListPaged.clear();
@@ -2474,8 +2469,11 @@ S1gRawCtr::DistributeStationsToRaws ()
 
 	CriticalStationsCI ci = this->m_criticalStations.begin();
 	uint16_t minaidcritical = (*std::min_element(m_criticalStations.begin(), m_criticalStations.end(), [](const SensorActuator *a, const SensorActuator *b){return a->GetAid() < b->GetAid(); }))->GetAid();
-	uint16_t maxaidsensor = (*std::max_element(m_sensorStations.begin(), m_sensorStations.end(), [](const Sensor *a, const Sensor *b){return a->GetAid() < b->GetAid(); }))->GetAid();
-
+	uint16_t maxaidsensor;
+	if (m_sensorStations.size())
+		maxaidsensor = (*std::max_element(m_sensorStations.begin(), m_sensorStations.end(), [](const Sensor *a, const Sensor *b){return a->GetAid() < b->GetAid(); }))->GetAid();
+	else
+		maxaidsensor = (*std::max_element(m_criticalStations.begin(), m_criticalStations.end(), [](const SensorActuator *a, const SensorActuator *b){return a->GetAid() < b->GetAid(); }))->GetAid();
 	s.SetStartAid(minaidcritical);
 	s.SetEndAid(maxaidsensor);
 	s.SetSlotStartTime(Time ());

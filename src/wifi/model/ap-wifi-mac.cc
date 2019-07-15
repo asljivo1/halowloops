@@ -418,8 +418,6 @@ void ApWifiMac::SetRawGroupInterval(uint32_t interval) {
 void ApWifiMac::SetTotalStaNum(uint32_t num) {
 	NS_LOG_FUNCTION(this << num);
 	m_totalStaNum = num;
-	//m_S1gRawCtr.RAWGroupping (m_totalStaNum, 1, m_beaconInterval.GetMicroSeconds ());
-	//m_S1gRawCtr.configureRAW ();
 
 }
 
@@ -1227,6 +1225,7 @@ void ApWifiMac::SendAssocResp(Mac48Address to, bool success, uint8_t staType, bo
 			}
 			m_criticalAids.push_back(aid);
 			m_numExpectedDlPacketsForAids.insert(std::pair<uint16_t, uint16_t>(aid, 0));
+			m_criticalInitializedMap.insert (std::pair<uint16_t, bool>(aid, false));
 			NS_LOG_INFO("m_criticalAids =" << m_criticalAids.size ());
 		}
 		else if (serviceCharacteristic == AidRequest::SENSOR)
@@ -1860,6 +1859,8 @@ void ApWifiMac::SendOneBeacon(void) {
 				m_low->CalculateOverallTxTime(packet, &hdr, params);
 		m_bufferTimeToAllowBeaconToBeReceived =
 				bufferTimeToAllowBeaconToBeReceived;
+		m_S1gRawCtr.m_prevBeaconTxDuration = bufferTimeToAllowBeaconToBeReceived;
+
 		NS_LOG_DEBUG(
 				"Transmission of beacon will take " << bufferTimeToAllowBeaconToBeReceived << ", delaying RAW start for that amount");
 		m_sharedSlotDuration = this->m_beaconInterval -  m_bufferTimeToAllowBeaconToBeReceived;
@@ -2128,6 +2129,7 @@ void ApWifiMac::OnRAWSlotStart(uint16_t rps, uint8_t rawGroup, uint8_t slot) {
 		//NS_LOG_UNCOND ("aid start allowed = " << GetCritAidFromSlotNum(targetSlot,*m_rpsset.rpsset.at(0)));
 		//std::cout << "rps=" << (int)rps-1 << ", rawGroup=" << (int)rawGroup-1 << ", slot=" << (int)slot-1 << std::endl;
 		if (m_qosSupported) {
+			//NS_LOG_DEBUG("Ap notifies EDCA about slot for aid = " << aid);
 			NotifyEdcaOfCsb(Simulator::Now(), slotDuration, csb);
 			m_rawSlotsEdca[edcaIndex].find(AC_VO)->second->AccessAllowedIfRaw(true);
 			m_rawSlotsEdca[edcaIndex].find(AC_VI)->second->AccessAllowedIfRaw(true);
@@ -2228,12 +2230,18 @@ void ApWifiMac::Receive(Ptr<Packet> packet, const WifiMacHeader *hdr) {
 				m_receivedAid.push_back(aid); //to change
 				m_receivedTimes.push_back(Simulator::Now());
 				// AP does nothing until it finds out all traffic intervals of all critical stations, to prevent accumulation of traffic
+				// AP drops seq 0 and 1 because warmup period (to find out traffic intervals)
 				if (this->m_criticalAids.size() && std::find(m_criticalAids.begin(), m_criticalAids.end(), aid) != m_criticalAids.end())
 					if (!m_S1gRawCtr.IsInfoAvailableForAllSta())
 					{
-						m_forwardedDownToAids = m_receivedAid;
-						NS_LOG_UNCOND ("**************** m_forwardedDownToAids = m_receivedAid **************");
-						return;
+						if (!m_criticalInitializedMap.find(aid)->second)
+						{
+							m_forwardedDownToAids = m_receivedAid;
+							NS_LOG_UNCOND ("**************** m_forwardedDownToAids = m_receivedAid **************");
+							if (seqTs.GetSeq() == 1)
+								m_criticalInitializedMap.find(aid)->second = true;
+							return;
+						}
 					}
 				if (hdr->IsQosData()) {
 					if (hdr->IsQosAmsdu()) {

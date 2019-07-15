@@ -357,9 +357,11 @@ private:
   std::map<uint16_t, Mac48Address> m_AidToMacAddr;
   std::map<Mac48Address, bool> m_accessList;
   std::vector<uint16_t> m_aidsForcePage;
+  std::map<uint16_t, bool> m_criticalInitializedMap;
 
   std::map<Mac48Address, bool> m_sleepList;
   std::map<Mac48Address, bool> m_supportPageSlicingList;
+
   std::vector<Ptr<DcaTxop>> m_rawSlotsDca;
   std::vector<EdcaQueues> m_rawSlotsEdca;
 

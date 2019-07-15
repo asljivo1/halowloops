@@ -158,10 +158,10 @@ public:
 	SensorActuator ();
 	virtual ~SensorActuator ();
 
-	uint32_t m_pendingDownlinkPackets;
-	bool m_paged;
-	uint32_t m_outstandingUplinkPackets;
-	uint32_t m_scheduledUplinkPackets;
+	uint32_t m_pendingDownlinkPackets; //
+	bool m_paged; //
+	uint32_t m_outstandingUplinkPackets; //
+	uint32_t m_scheduledUplinkPackets; //
 	uint64_t m_nTx;
 	Time m_tSuccessLast;
 	Time m_tSuccessPreLast;
@@ -286,6 +286,7 @@ public:
     
     Time m_startOptimalOpp;
     bool m_success;
+    Time m_prevBeaconTxDuration;
 private:
     
 	std::vector <Time> m_t_succ;

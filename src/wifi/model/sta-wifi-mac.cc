@@ -67,7 +67,7 @@ NS_LOG_COMPONENT_DEFINE ("StaWifiMac");
 
 NS_OBJECT_ENSURE_REGISTERED (StaWifiMac);
 uint32_t al = 1, ah= 1;
-std::vector<uint32_t> trackit {1,2};
+std::vector<uint32_t> trackit {1};
 TypeId
 StaWifiMac::GetTypeId (void)
 {
@@ -437,7 +437,7 @@ StaWifiMac::SendPspollIfnecessary (void)
 
 		m_DTIMCount = m_TIM.GetDTIMCount();
 		//m_PageSliceNum = m_TIM.GetPageSliceNum ();
-
+		//NS_LOG_DEBUG("[aid=" << GetAID(0) << "] StaWifiMac::S1gTIMReceived");
 		if (m_TIM.GetDTIMCount() == 0)
 		{
 			m_pagedInDtim = false;
@@ -773,7 +773,7 @@ StaWifiMac::GoToSleepBinary (int value)
             {
                 m_low->GetPhy()->SetSleepMode();
                 if (testtrackit)
-                	NS_LOG_DEBUG (m_low->GetAddress() << " GoToSleepBinary sleepok. not wating ack");
+                	NS_LOG_DEBUG ("@ " << Simulator::Now() << " " << m_low->GetAddress() << " GoToSleepBinary sleepok. not wating ack");
             }
             else if (waitingack && (outsideraw || stationrawslot))
             {
@@ -988,8 +988,11 @@ void
 StaWifiMac::OutsideRawStartBackoff (void)
 {
 	//NS_LOG_DEBUG ("aid=" << this->GetAID(0) << "StaWifiMac::OutsideRawStartBackoff");
-	if (this->GetAidRequest().GetServiceCharacteristic() == AidRequest::CRITICAL_SERVICE)
-		return;
+	//this disabled critical stations to access the medium in shared slot. Normally, AccessAllowedIfRaw is set to 1 in shared slot for all stations
+	// which enables them to also receive the beacon in the next BI. If the last RAW group was the one of critical station, OnRawSlotEnd sets AccessAllowedIfRaw
+	// to 0 for that critical station, and when the next beacon is transmitted, the station cannot access the medium to receive it. Therefore, I disabled it
+	/*if (this->GetAidRequest().GetServiceCharacteristic() == AidRequest::CRITICAL_SERVICE)
+		return;*/
    if (m_insideBackoffEvent.IsRunning ())
      {
        m_insideBackoffEvent.Cancel ();
@@ -1728,7 +1731,9 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         	m_currentslotDuration.push_back(m_sharedSlotDuration);
         	m_rawStart = true;
         	S1gTIMReceived(beacon);
+        	//NS_LOG_DEBUG("[aid=" << GetAID(0) << "] goodBeacon, associated");
         }
+        //NS_LOG_DEBUG("[aid= goodBeacon, not associated?");
         AuthenticationCtrl AuthenCtrl;
          AuthenCtrl = beacon.GetAuthCtrl ();
          fasTAssocType = AuthenCtrl.GetControlType ();
@@ -1757,9 +1762,9 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
     	Time sleept = Time();
     	for (int i = 0; i < m_statSlotStart.size(); i++)
     	{
-    		if (m_statSlotStart[i] > MicroSeconds (1))
+    		if (m_statSlotStart[i] > NanoSeconds (1))
     		{
-    			sleept = m_statSlotStart[i] - MicroSeconds (1);
+    			sleept = m_statSlotStart[i]; // - NanoSeconds (1)
     			GoToSleep (sleept);
         		//NS_LOG_UNCOND ("aid=" << m_aids[0] << ": Sleep now. After " <<  sleept << " sheduled wakeup.");
 
@@ -1772,7 +1777,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
 
     		}
     		//std::cout << "+++++++++++PAGEDDD SLEEP FOR " << sleept.GetMicroSeconds() << "us and then wake up" << timeBeacon << std::endl;
-    		NS_LOG_DEBUG ("aid=" << m_aids[0] << ": At the end of the slot after " << sleept + this->m_currentslotDuration[i] << " go to sleep." );
+    		NS_LOG_DEBUG ("aid=" << m_aids[0] << ": At the end of the slot after " << sleept + this->m_currentslotDuration[i] << " go to sleep; now = " << Simulator::Now() );
     		//schedule sleep at the end of each slot
     		Simulator::Schedule(sleept + this->m_currentslotDuration[i], &StaWifiMac::GoToSleepBinary, this, 0); //own slot
 
