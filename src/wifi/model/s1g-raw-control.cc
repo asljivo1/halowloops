@@ -155,7 +155,7 @@ Slot::SetSlotStartTime (Time start)
 	m_slotStartTime = start;
 }
 
-SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0), m_oldRawStart (INT_MAX), m_newRawStart (INT_MAX), m_tSent (Time ()), m_tSentPrev (Time ()), m_tInterval (Time ()), m_tIntervalMin (Time ()), m_tIntervalMax (Time ()), m_tEnqMin (Time ()), m_outstandingUplinkPackets (0), m_scheduledUplinkPackets (0), m_numOutstandingDl(0)
+SensorActuator::SensorActuator (void) : m_pendingDownlinkPackets(0), m_paged (false), m_nTx (0), m_oldRawStart (INT_MAX), m_newRawStart (INT_MAX), m_tSent (Time ()), m_tSentPrev (Time ()), m_tInterval (Time ()), m_tIntervalMin (Time ()), m_tIntervalMax (Time ()), m_tEnqMin (Time ()), m_outstandingUplinkPackets (0), m_scheduledUplinkPackets (0), m_numOutstandingDl(0), m_deltaT(Time())
 {
 
 }
@@ -566,7 +566,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 		NS_LOG_DEBUG("Sta " << sta->GetAid() << " delivered the last packet to AP at " << sta->m_tSent << ", interval=" << sta->m_tInterval << ", est. num. of outstanding UL pacets is " << sta->m_outstandingUplinkPackets);
 		NS_LOG_DEBUG("Sta " << sta->GetAid() << " should transmit " << numScheduledUl << " packets in the next BI, interval=" << sta->m_tInterval);
 		sta->m_numOutstandingDl = numExpectedDlPacketsForAids.find(sta->GetAid())->second;
-
+		sta->m_deltaT = sta->m_tSent + (numOutstandingUl + 1) * sta->m_tInterval - Simulator::Now();
 
 	}
 
@@ -1424,10 +1424,13 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	SensorActuator * sta = LookupCriticalSta (aid);
 	    	ostr << " STA #" << h << ", AID=" << aid << ", UL to be sent by next BI = " << sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets
 	    			<< ", outstanding DL = " << sta->m_numOutstandingDl << ", m_pendingDownlinkPackets = " << sta->m_pendingDownlinkPackets << ", m_paged = "
-	    			<< sta->m_paged << ", DT BI-tSENT = " << Simulator::Now().GetMicroSeconds() - sta->m_tSent.GetMicroSeconds();
+	    			<< sta->m_paged << ", DT BI-tSENT = " << Simulator::Now().GetMicroSeconds() - sta->m_tSent.GetMicroSeconds() << ", sta->m_deltaT us = " << sta->m_deltaT.GetMicroSeconds();
 	    	int ulPacketsh = sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets;
 	    	scheduledUlTotal += ulPacketsh;
-	    	geqNumPackets += 2 * (ulPacketsh - std::ceil(ulPacketsh * 1.0 / (ulPacketsh + 1.0)));
+	    	//geqNumPackets += 2 * (ulPacketsh - std::ceil(ulPacketsh * 1.0 / (ulPacketsh + 1.0)));
+
+	    	uint16_t epsh = sta->m_deltaT <= MicroSeconds (tPacketTx) ? 1 : 0;
+	    	geqNumPackets += 2 * (ulPacketsh - std::ceil(ulPacketsh * 1.0 / (ulPacketsh + 1.0)) + epsh);
 	    	ostr << ", t_sent us = " << sta->m_tSent.GetMicroSeconds() << ", t_interval = " << sta->m_tInterval.GetMicroSeconds();
 	    	if (sta->m_numOutstandingDl || sta->m_pendingDownlinkPackets)
 	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
@@ -1812,7 +1815,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    {
 	    	Slot s;
 	    	uint64_t duration = c[i].get(GRB_DoubleAttr_X);
-	    	if (duration > 0)
+	    	if (duration > 0 && ((int)duration - 500) / 120 > 1)
 	    	{
 
 	    		for (int h = 0; h < n; h++)
@@ -1925,6 +1928,27 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    		acc += MicroSeconds (duration);
 	    	}
 
+	    }
+	    int remaining = Tch.get(GRB_DoubleAttr_X) - acc.GetMicroSeconds() - 5000;
+	    std::cout << "acc = " << acc.GetMicroSeconds() << ", remaining = " << remaining << std::endl;
+	    Slot last;
+	    last.SetStartAid(*sensorList.begin());
+	    last.SetEndAid(sensorList.back());
+	    last.SetSlotStartTime(acc);
+	    if (remaining >= 500)
+	    {
+	    	uint16_t count = (remaining - 500) / 120;
+	    	if (count < 256)
+	    		last.SetSlotFormat(0);
+	    	else if (count < 2048)
+	    		last.SetSlotFormat(1);
+	    	else
+	    	{
+	    		NS_LOG_UNCOND ("Too large slot count attempted for non-critical last slot, count = " << count << ", duration us=" << remaining);
+	    		//NS_ASSERT (false);
+	    	}
+	    	last.SetSlotCount(count);
+	    	slots.push_back(last);
 	    }
 	    EncodeRaws (slots);
 	    ostr << "Transmission of beacon will take = " << this->GetBeaconTxDuration(criticalList).GetMicroSeconds() << " us" << std::endl;

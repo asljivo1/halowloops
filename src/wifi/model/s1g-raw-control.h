@@ -177,6 +177,7 @@ public:
 
 	Time m_tEnqMin;
 	int m_numOutstandingDl; // if STA send and UL close to the end of BI, and it cannot be processed before the beacon, it will not be paged in the beacon. It will be outstanding.
+	Time m_deltaT;
 private:
 
 
