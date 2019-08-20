@@ -1815,12 +1815,12 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    {
 	    	Slot s;
 	    	uint64_t duration = c[i].get(GRB_DoubleAttr_X);
-	    	if (duration > 0 && ((int)duration - 500) / 120 > 1)
+	    	if (duration > 0)
 	    	{
 
 	    		for (int h = 0; h < n; h++)
 	    		{
-	    			if (w[i][h].get(GRB_DoubleAttr_X) == 1)
+	    			if (w[i][h].get(GRB_DoubleAttr_X) > 0)
 	    			{
 	    				s.SetAid(h+1);
 	    				s.SetSlotStartTime(acc);
@@ -1925,6 +1925,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    			}
 	    		}
 	    		slots.push_back(s);
+
 	    		acc += MicroSeconds (duration);
 	    	}
 
