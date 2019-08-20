@@ -444,6 +444,16 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 			//NS_LOG_UNCOND ("initial, aid = " << *ci);
 
 		}
+		else
+		{
+			SensorActuator * sta = LookupCriticalSta (*ci);
+			sta->m_deltaT = Time();
+			sta->m_outstandingUplinkPackets = 0;
+			sta->m_numOutstandingDl = 0;
+			sta->m_paged = false;
+			sta->m_pendingDownlinkPackets = 0;
+			sta->m_scheduledUplinkPackets = 0;
+		}
 	}
 	bool disassoc;
 	CriticalStationsCI itcheck = m_criticalStations.begin();
@@ -515,6 +525,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 		}
 	}
 
+
 	for (std::vector<uint16_t>::iterator ci = enqueuedToAids.begin(); ci != enqueuedToAids.end(); ci++)
 	{
 		bool match = false;
@@ -526,7 +537,6 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 				break;
 			}
 		}
-
 		SensorActuator * stationTransmit = LookupCriticalSta (*ci);
 		if (stationTransmit != nullptr && !match)
 		{
@@ -566,6 +576,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 		NS_LOG_DEBUG("Sta " << sta->GetAid() << " delivered the last packet to AP at " << sta->m_tSent << ", interval=" << sta->m_tInterval << ", est. num. of outstanding UL pacets is " << sta->m_outstandingUplinkPackets);
 		NS_LOG_DEBUG("Sta " << sta->GetAid() << " should transmit " << numScheduledUl << " packets in the next BI, interval=" << sta->m_tInterval);
 		sta->m_numOutstandingDl = numExpectedDlPacketsForAids.find(sta->GetAid())->second;
+
 		sta->m_deltaT = sta->m_tSent + (numOutstandingUl + 1) * sta->m_tInterval - Simulator::Now();
 
 	}
