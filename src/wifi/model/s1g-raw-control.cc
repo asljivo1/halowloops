@@ -1430,7 +1430,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	//geqNumPackets += 2 * (ulPacketsh - std::ceil(ulPacketsh * 1.0 / (ulPacketsh + 1.0)));
 
 	    	uint16_t epsh = sta->m_deltaT <= MicroSeconds (tPacketTx) ? 1 : 0;
-	    	geqNumPackets += 2 * (ulPacketsh - std::ceil(ulPacketsh * 1.0 / (ulPacketsh + 1.0)) + epsh);
+	    	//geqNumPackets += 2 * (ulPacketsh - std::ceil((ulPacketsh + epsh) * 1.0 / (ulPacketsh + epsh + 1.0)) + epsh);
+	    	geqNumPackets += 2 * (ulPacketsh - std::ceil((ulPacketsh + epsh) * 1.0 / (ulPacketsh + epsh + 1.0)) + epsh);
 	    	ostr << ", t_sent us = " << sta->m_tSent.GetMicroSeconds() << ", t_interval = " << sta->m_tInterval.GetMicroSeconds();
 	    	if (sta->m_numOutstandingDl || sta->m_pendingDownlinkPackets)
 	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
@@ -1820,7 +1821,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 
 	    		for (int h = 0; h < n; h++)
 	    		{
-	    			if (w[i][h].get(GRB_DoubleAttr_X) > 0.5)
+	    			if (w[i][h].get(GRB_DoubleAttr_X) > 0.01)
 	    			{
 	    				s.SetAid(h+1);
 	    				s.SetSlotStartTime(acc);
