@@ -1820,7 +1820,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 
 	    		for (int h = 0; h < n; h++)
 	    		{
-	    			if (w[i][h].get(GRB_DoubleAttr_X) > 0)
+	    			if (w[i][h].get(GRB_DoubleAttr_X) == 1)
 	    			{
 	    				s.SetAid(h+1);
 	    				s.SetSlotStartTime(acc);
