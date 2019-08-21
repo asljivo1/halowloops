@@ -1433,7 +1433,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    {
 	    	uint16_t aid = criticalList[h];
 	    	SensorActuator * sta = LookupCriticalSta (aid);
-	    	ostr << " STA #" << h << ", AID=" << aid << ", UL to be sent by next BI = " << sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets
+	    	ostr << "\n STA #" << h << ", AID=" << aid << ", UL to be sent by next BI = " << sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets
 	    			<< ", outstanding DL = " << sta->m_numOutstandingDl << ", m_pendingDownlinkPackets = " << sta->m_pendingDownlinkPackets << ", m_paged = "
 	    			<< sta->m_paged << ", DT BI-tSENT = " << Simulator::Now().GetMicroSeconds() - sta->m_tSent.GetMicroSeconds() << ", sta->m_deltaT us = " << sta->m_deltaT.GetMicroSeconds();
 	    	int ulPacketsh = sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets;
