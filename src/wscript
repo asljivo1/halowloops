@@ -66,10 +66,8 @@ def configure(conf):
     conf.env.append_value('NS3_MODULE_PATH', blddir)
 
     #Link libgurobi
-    conf.env.append_value ('SHLIB_MARKER', '-Wl,--no-as-needed,-lglpk,-lm,-lgurobi_c++,-lgurobi81')
-    conf.env['gurobi'] = conf.check(mandatory = True, lib = 'gurobi_c++', uselib_store='gurobi')
-    have_gurobi = conf.check_nonfatal(header_name='gurobi_c++.h', define_name = 'HAVE_GUROBI', use='gurobi')
-    
+    conf.env.append_value('SHLIB_MARKER', '-Wl,--no-as-needed,-lglpk,-lm,-lgurobi_c++,-lgurobi81')
+
     for module in all_modules:
         conf.recurse(module, mandatory=False)
 
@@ -308,7 +306,6 @@ def ns3_python_bindings(bld):
         pymod.mac_bundle = True
 
     return pymod
-
 
 def build(bld):
     bld.create_ns3_module = types.MethodType(create_ns3_module, bld)
