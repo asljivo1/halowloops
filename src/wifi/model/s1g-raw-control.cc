@@ -1440,7 +1440,9 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	scheduledUlTotal += ulPacketsh;
 	    	//geqNumPackets += 2 * (ulPacketsh - std::ceil(ulPacketsh * 1.0 / (ulPacketsh + 1.0)));
 
-	    	uint16_t epsh = sta->m_deltaT <= MicroSeconds (tPacketTx) ? 1 : 0;
+	    	//uint16_t epsh = sta->m_deltaT <= MicroSeconds (tPacketTx) ? 1 : 0;
+	    	uint32_t prevBeaconTxTime (5000);
+	    	int epsh = sta->m_tSent.GetMicroSeconds() + sta->m_tInterval.GetMicroSeconds() * (ulPacketsh + 1) - 2 * tPacketTx - tProcessing.GetMicroSeconds() < Simulator::Now().GetMicroSeconds() + BeaconInterval + prevBeaconTxTime ? 1 : 0;
 	    	//geqNumPackets += 2 * (ulPacketsh - std::ceil((ulPacketsh + epsh) * 1.0 / (ulPacketsh + epsh + 1.0)) + epsh);
 	    	geqNumPackets += 2 * (ulPacketsh - std::ceil((ulPacketsh + epsh) * 1.0 / (ulPacketsh + epsh + 1.0)) + epsh);
 	    	ostr << ", t_sent us = " << sta->m_tSent.GetMicroSeconds() << ", t_interval = " << sta->m_tInterval.GetMicroSeconds();
@@ -1770,7 +1772,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    			"because it is infeasible or unbounded" << std::endl;
 
 	    	// do IIS
-	    	/*if (Simulator::Now() < simulationTime + Seconds (2))
+	    	if (Simulator::Now() < simulationTime + Seconds (2))
 	    	{
 	    		model.computeIIS();
 	    		ostr << "\nThe following constraint(s) " << "cannot be satisfied:" << std::endl;
@@ -1784,7 +1786,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    			}
 	    		}
 
-	    	}*/
+	    	}
 	    	ostr.close();
 	    	return false;
 	    }
