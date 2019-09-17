@@ -1772,7 +1772,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    			"because it is infeasible or unbounded" << std::endl;
 
 	    	// do IIS
-	    	if (Simulator::Now() < simulationTime + Seconds (2))
+	    	/*if (Simulator::Now() < simulationTime + Seconds (2))
 	    	{
 	    		model.computeIIS();
 	    		ostr << "\nThe following constraint(s) " << "cannot be satisfied:" << std::endl;
@@ -1786,7 +1786,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    			}
 	    		}
 
-	    	}
+	    	}*/
 	    	ostr.close();
 	    	return false;
 	    }
