@@ -1882,7 +1882,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    					//next slot exists, merge with the next slot
 	    					for (int h = 0; h < n; h++)
 	    					{
-	    						if (w[next][h].get(GRB_DoubleAttr_X) == 1)
+	    						if (round(w[next][h].get(GRB_DoubleAttr_X)) == 1.0)
 	    						{
 	    							duration += c[next].get(GRB_DoubleAttr_X);
 	    							s.SetAid(h+1);

@@ -2477,7 +2477,6 @@ ApWifiMac::UpdateQueues (RPS newRps)
 			if (!overlaps)
 			{
 				differentRawGroups.push_back(rawGroup);
-				change= true;
 			}
 		}
 	}
@@ -2490,10 +2489,22 @@ ApWifiMac::UpdateQueues (RPS newRps)
 		{
 			uint32_t i = m_StartaidEndaidToEdcaIndexes.size();
 			m_StartaidEndaidToEdcaIndexes.push_back(std::tuple<uint16_t, uint16_t, uint32_t>(it->first, it->second, i));
+			change= true;
 		}
 	}
 
 	//TODO iterate through m_StartaidEndaidToEdcaIndexes and delete all RAWs that are there but not in differentRawGroups, if there are no pending packets there
+    for (auto tit = m_StartaidEndaidToEdcaIndexes.begin(); tit != m_StartaidEndaidToEdcaIndexes.end(); ++tit)
+    {
+		auto mapit = std::find_if (differentRawGroups.begin(), differentRawGroups.end(), [&tit](const std::pair<uint16_t,uint16_t> a){return a.first == std::get<0>(*tit) && a.second == std::get<1>(*tit);});
+		if (mapit == differentRawGroups.end())
+		{
+			// delete instance because it is outdated
+			// hotfix: do not delete, but set (startaid, endaid) = (0, 0)
+			std::get<0>(*tit) = 0;
+			std::get<1>(*tit) = 0;
+		}
+    }
 
 /*
 
