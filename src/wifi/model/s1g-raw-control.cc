@@ -1427,7 +1427,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    prevRps->Print(ostr);
 
 
-	    uint32_t scheduledUlTotal (0), leqNumPackets (0), geqNumPackets (0);
+	    uint32_t scheduledUlTotal (0);
 	    std::map<uint16_t, bool> pagedAids, outsdandingAids;
 	    for (int h=0; h < criticalList.size(); h++)
 	    {
@@ -1435,31 +1435,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	SensorActuator * sta = LookupCriticalSta (aid);
 	    	ostr << "\n STA #" << h << ", AID=" << aid << ", UL to be sent by next BI = " << sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets
 	    			<< ", outstanding DL = " << sta->m_numOutstandingDl << ", m_pendingDownlinkPackets = " << sta->m_pendingDownlinkPackets << ", m_paged = "
-	    			<< sta->m_paged << ", DT BI-tSENT = " << Simulator::Now().GetMicroSeconds() - sta->m_tSent.GetMicroSeconds() << ", sta->m_deltaT us = " << sta->m_deltaT.GetMicroSeconds();
-	    	int ulPacketsh = sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets;
-	    	scheduledUlTotal += ulPacketsh;
-	    	//geqNumPackets += 2 * (ulPacketsh - std::ceil(ulPacketsh * 1.0 / (ulPacketsh + 1.0)));
-
-	    	//uint16_t epsh = sta->m_deltaT <= MicroSeconds (tPacketTx) ? 1 : 0;
-	    	uint32_t prevBeaconTxTime (5000);
-	    	int epsh = sta->m_tSent.GetMicroSeconds() + sta->m_tInterval.GetMicroSeconds() * (ulPacketsh + 1) - 2 * tPacketTx - tProcessing.GetMicroSeconds() < Simulator::Now().GetMicroSeconds() + BeaconInterval + prevBeaconTxTime ? 1 : 0;
-	    	//geqNumPackets += 2 * (ulPacketsh - std::ceil((ulPacketsh + epsh) * 1.0 / (ulPacketsh + epsh + 1.0)) + epsh);
-	    	geqNumPackets += 2 * (ulPacketsh - std::ceil((ulPacketsh + epsh) * 1.0 / (ulPacketsh + epsh + 1.0)) + epsh);
-	    	ostr << ", t_sent us = " << sta->m_tSent.GetMicroSeconds() << ", t_interval = " << sta->m_tInterval.GetMicroSeconds();
-	    	if (sta->m_numOutstandingDl || sta->m_pendingDownlinkPackets)
-	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
-	    	else
-	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 0));
-
-	    	bool outstandingUl = sta->m_tSent + sta->m_tInterval <= Simulator::Now();
-	    	if (outstandingUl)
-	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 1));
-	    	else
-	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 0));
-	    	leqNumPackets += (uint32_t)pagedAids.find(h)->second; //+ (uint32_t)outsdandingAids.find(h)->second;
-	    	geqNumPackets += (uint32_t)pagedAids.find(h)->second;
+	    			<< sta->m_paged << ", DT BI-tSENT = " << Simulator::Now().GetMicroSeconds() - sta->m_tSent.GetMicroSeconds() << ", sta->m_deltaT us = " << sta->m_deltaT.GetMicroSeconds()<< ", t_sent us = " << sta->m_tSent.GetMicroSeconds() << ", t_interval = " << sta->m_tInterval.GetMicroSeconds();;
 	    }
-	    leqNumPackets += 2 * scheduledUlTotal;
 	    std::ostringstream vname;
 	    vname.str("");
 	    vname << "meff";
@@ -1542,7 +1519,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    }
 	    model.setObjective(obj, GRB_MINIMIZE);
 
-	    // Constraint 41 + Constraint 42 + Constraint 43
+	    // Constraint 41 + Constraint 42 + Constraint 43 + Constraint 47 + Constraint 48
 	    for (int h=0; h < n; h++)
 	    {
 	    	GRBLinExpr sumwi (0);
@@ -1565,12 +1542,43 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    		vname << "CON_43.right_" << i << "." << h;
 	    		model.addConstr(s[i][h] <= 0.5 + 0.5 * sumwUptoI, vname.str());
 	    	}
+	    	uint32_t leqNumPackets (0), geqNumPackets (0);
+	    	uint16_t aid = criticalList[h];
+	    	SensorActuator * sta = LookupCriticalSta (aid);
+	    	int ulPacketsh = sta->m_scheduledUplinkPackets + sta->m_outstandingUplinkPackets;
+	    	//scheduledUlTotal += ulPacketsh;
+	    	uint32_t prevBeaconTxTime (5000);
+	    	int epsh = sta->m_tSent.GetMicroSeconds() + sta->m_tInterval.GetMicroSeconds() * (ulPacketsh + 1) - 2 * tPacketTx - tProcessing.GetMicroSeconds() < Simulator::Now().GetMicroSeconds() + BeaconInterval + prevBeaconTxTime ? 1 : 0;
+	    	geqNumPackets += 2 * (ulPacketsh - std::ceil((ulPacketsh + epsh) * 1.0 / (ulPacketsh + epsh + 1.0)) + epsh);
+
+	    	if (sta->m_numOutstandingDl || sta->m_pendingDownlinkPackets)
+	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 1));
+	    	else
+	    		pagedAids.insert(std::pair<uint16_t, bool>(h, 0));
+
+	    	bool outstandingUl = sta->m_tSent + sta->m_tInterval <= Simulator::Now();
+	    	if (outstandingUl)
+	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 1));
+	    	else
+	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 0));
+	    	leqNumPackets += (uint32_t)pagedAids.find(h)->second + sta->m_outstandingUplinkPackets + 2 * sta->m_scheduledUplinkPackets ;
+	    	geqNumPackets += (uint32_t)pagedAids.find(h)->second;
 	    	vname.str("");
 	    	vname << "CON_41_" << h;
 	    	model.addConstr(sumwi >= 0, vname.str());
+	    	// Constraint 47
+	    	vname.str("");
+	    	vname << "CON_47_";
+	    	model.addConstr(sumwi <= leqNumPackets, vname.str());
+	    	// Constraint 48
+	    	vname.str("");
+	    	vname << "CON_48_";
+	    	model.addConstr(sumwi >= geqNumPackets
+	    			//2 * scheduledUlTotal + 2 * std::count_if(outsdandingAids.begin(), outsdandingAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;}) - 2 - std::count_if(pagedAids.begin(), pagedAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;})
+	    			, vname.str()); //2 * scheduledUlTotal
 	    }
 	    // Constraint 45 + Constraint 46
-	    GRBLinExpr sumwih (0), sumri (0), sumci (0);
+	    GRBLinExpr sumri (0), sumci (0);
 	    for (int i=0; i < m; i++)
 	    {
 	    	sumri += r[i]; // for Constraint 50
@@ -1586,19 +1594,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    		vname.str("");
 	    		vname << "CON_46_" << i << "." << h;
 	    		model.addQConstr(d[i][h] == w[i][h] * dBracket, vname.str());
-	    		sumwih += w[i][h]; // for Constraint 47 and Constraint 48
 	    	}
 	    }
-	    // Constraint 47
-	    vname.str("");
-	    vname << "CON_47_";
-	    model.addConstr(sumwih <= leqNumPackets, vname.str());
-	    // Constraint 48
-	    vname.str("");
-	    vname << "CON_48_";
-	    model.addConstr(sumwih >= geqNumPackets
-	    		//2 * scheduledUlTotal + 2 * std::count_if(outsdandingAids.begin(), outsdandingAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;}) - 2 - std::count_if(pagedAids.begin(), pagedAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;})
-	    		, vname.str()); //2 * scheduledUlTotal
 	    // Constraint 50
 	    vname.str("");
 	    vname << "CON_50_";
