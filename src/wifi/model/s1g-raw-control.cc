@@ -1568,11 +1568,11 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	model.addConstr(sumwi >= 0, vname.str());
 	    	// Constraint 47
 	    	vname.str("");
-	    	vname << "CON_47_";
+	    	vname << "CON_47_" << h;
 	    	model.addConstr(sumwi <= leqNumPackets, vname.str());
 	    	// Constraint 48
 	    	vname.str("");
-	    	vname << "CON_48_";
+	    	vname << "CON_48_" << h;
 	    	model.addConstr(sumwi >= geqNumPackets
 	    			//2 * scheduledUlTotal + 2 * std::count_if(outsdandingAids.begin(), outsdandingAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;}) - 2 - std::count_if(pagedAids.begin(), pagedAids.end(), [](const std::pair<uint16_t, bool>& a){return a.second;})
 	    			, vname.str()); //2 * scheduledUlTotal
