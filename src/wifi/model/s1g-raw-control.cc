@@ -1561,7 +1561,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 1));
 	    	else
 	    		outsdandingAids.insert(std::pair<uint16_t, bool>(h, 0));
-	    	leqNumPackets += (uint32_t)pagedAids.find(h)->second + sta->m_outstandingUplinkPackets + 2 * sta->m_scheduledUplinkPackets ;
+	    	leqNumPackets += (uint32_t)pagedAids.find(h)->second + 2 * (sta->m_outstandingUplinkPackets + sta->m_scheduledUplinkPackets);
 	    	geqNumPackets += (uint32_t)pagedAids.find(h)->second;
 	    	vname.str("");
 	    	vname << "CON_41_" << h;
