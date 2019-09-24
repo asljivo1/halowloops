@@ -557,20 +557,27 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 	for (auto sta : m_criticalStations)
 	{
 		int numOutstandingUl (0);
+		//&& sta->m_tInterval < MicroSeconds(m_beaconInterval)
 		while (sta->m_tInterval != Time() && sta->m_tSent + (numOutstandingUl + 1) * sta->m_tInterval <= Simulator::Now())
 		{
 			numOutstandingUl++;
-			if (std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
-				m_aidForcePage.push_back(sta->GetAid());
+			/*if (std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
+				m_aidForcePage.push_back(sta->GetAid());*/
 		}
 		sta->m_outstandingUplinkPackets = numOutstandingUl;
 		int numScheduledUl (0);
 		while (sta->m_tInterval != Time() && sta->m_tSent + (numOutstandingUl + numScheduledUl + 1) * sta->m_tInterval > Simulator::Now() && sta->m_tSent + (numOutstandingUl + numScheduledUl + 1) * sta->m_tInterval < Simulator::Now() + MicroSeconds(m_beaconInterval))
 		{
 			numScheduledUl++;
-			if (std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
-				m_aidForcePage.push_back(sta->GetAid());
+			/*if (std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end())
+				m_aidForcePage.push_back(sta->GetAid());*/
 		}
+
+		if (std::find(m_aidForcePage.begin(), m_aidForcePage.end(), sta->GetAid()) == m_aidForcePage.end() && sta->m_tInterval != Time())
+			if (numOutstandingUl + numScheduledUl > 1)
+				m_aidForcePage.push_back(sta->GetAid());
+			/*else if (sta->m_tSent + (numOutstandingUl + numScheduledUl + 1) * sta->m_tInterval <= Simulator::Now() + MicroSeconds(m_beaconInterval))
+				m_aidForcePage.push_back(sta->GetAid());*/
 		//numScheduledUl -= numOutstandingUl;
 		sta->m_scheduledUplinkPackets = numScheduledUl;
 		NS_LOG_DEBUG("Sta " << sta->GetAid() << " delivered the last packet to AP at " << sta->m_tSent << ", interval=" << sta->m_tInterval << ", est. num. of outstanding UL pacets is " << sta->m_outstandingUplinkPackets);
@@ -1809,6 +1816,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    		ostr << std::left << std::setw(6) << w[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << w[i][h].get(GRB_DoubleAttr_X);
 	    		ostr << std::left << std::setw(6) << u[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << u[i][h].get(GRB_DoubleAttr_X);
 	    		ostr << std::left << std::setw(6) << d[i][h].get(GRB_StringAttr_VarName) << std::setw(3) << " = " << std::setw(10) << d[i][h].get(GRB_DoubleAttr_X);
+	    		if (std::find(m_aidForcePage.begin(), m_aidForcePage.end(), h+1) == m_aidForcePage.end() && round (d[i][h].get(GRB_DoubleAttr_X)) == 1)
+	    			this->m_aidForcePage.push_back(h + 1);
 	    	}
 	    	ostr << std::endl;
 	    }
@@ -1826,7 +1835,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    {
 	    	Slot s;
 	    	uint64_t duration = c[i].get(GRB_DoubleAttr_X);
-	    	if (duration > 0)
+	    	//NS_LOG_UNCOND ("**** duration = " << duration << ", c[i].get(GRB_DoubleAttr_X) = " << c[i].get(GRB_DoubleAttr_X));
+	    	if (duration > 2)
 	    	{
 
 	    		for (int h = 0; h < n; h++)
@@ -1867,11 +1877,13 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    					//NS_ASSERT (false);
 	    				}
 	    				s.SetSlotCount(count);
+	    				//NS_LOG_UNCOND ("**** dodajem sensor slot duration = " << (double)duration << ", count = " << (double)count);
 	    			}
 	    			else
 	    			{
 	    				//duration is larger than 0 but smaller than 500 (minimal slot duration is 500)
 	    				//merge this slot with the previous or next one
+	    				//NS_LOG_UNCOND ("**** duration is larger than 0 but smaller than 500, duration = " << (double)duration);
 	    				bool fixed (false);
 	    				auto next = i + 1;
 	    				while (next < m && !fixed)

@@ -67,7 +67,7 @@ NS_LOG_COMPONENT_DEFINE ("StaWifiMac");
 
 NS_OBJECT_ENSURE_REGISTERED (StaWifiMac);
 uint32_t al = 1, ah= 1;
-std::vector<uint32_t> trackit {1};
+std::vector<uint32_t> trackit {1,2,3,4};
 TypeId
 StaWifiMac::GetTypeId (void)
 {
@@ -418,7 +418,8 @@ StaWifiMac::SendPspollIfnecessary (void)
 	void StaWifiMac::S1gTIMReceived(S1gBeaconHeader beacon)
 	{
 		m_TIM = beacon.GetTIM();
-
+		if (testtrackit)
+		NS_LOG_DEBUG ("[aid=" << GetAID(0) << "] StaWifiMac::S1gTIMReceived. m_pagedInDtim = " << m_pagedInDtim << ", m_TIM.GetDTIMCount()=" << m_TIM.GetDTIMCount());
 		if (!m_pagedInDtim && !(m_TIM.GetDTIMCount() == 0)) //(!(m_pagedInDtim ^ m_TIM.GetDTIMCount() == 0))
 			return;
 
@@ -1664,6 +1665,7 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         m_statSlotStart.clear();
         m_currentslotDuration.clear();
         m_slotCounter=-1;
+
         if (IsAssociated())
         {
         	uint8_t * rawassign;
@@ -1716,14 +1718,14 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
         			if ((ass.GetRawGroupAIDStart() <= (GetAID(0) & 0x03ff)) && ((GetAID(0) & 0x03ff) <= ass.GetRawGroupAIDEnd()))
         			{
         				m_statSlotStart.push_back(MicroSeconds((500 + m_slotDurationCount * 120)*statRawSlot+m_currentRAW_start));//
-        				//NS_LOG_DEBUG ("aid=" << GetAID(0) << ", ass.GetRawStart=" << (int)ass.GetRawStart() << ", m_statSlotStart=" << m_statSlotStart);
+        				//NS_LOG_DEBUG ("aid=" << GetAID(0) << ", ass.GetRawStart=" << (int)ass.GetRawStart());
 
         				SetInRAWgroup ();
         				m_currentslotDuration.push_back(m_slotDuration); //To support variable time duration among multiple RAWs
-        				//NS_LOG_DEBUG (Simulator::Now () << ", StaWifiMac:: GetAID(0) = " << GetAID(0) <<  ", m_statSlotStart=" << m_statSlotStart << ", m_lastRawDurationus = " << m_lastRawDurationus << ", m_currentslotDuration = " << m_currentslotDuration);
+        				//NS_LOG_DEBUG (Simulator::Now ().GetSeconds() << ", StaWifiMac:: GetAID(0) = " << GetAID(0) <<  ", m_statSlotStart=" << m_statSlotStart << ", m_lastRawDurationus = " << m_lastRawDurationus << ", m_currentslotDuration = " << m_currentslotDuration);
         				//break; //break should not used if multiple RAW is supported
         			}
-        			//NS_LOG_DEBUG (Simulator::Now () << ", StaWifiMac:: GetAID(0) = " << GetAID(0) << ", raw_start =" << raw_start << ", raw_end=" << raw_end << ", m_statSlotStart=" << m_statSlotStart << ", m_lastRawDurationus = " << m_lastRawDurationus << ", m_currentslotDuration = " << m_currentslotDuration);
+        			//NS_LOG_DEBUG (Simulator::Now ().GetSeconds() << ", StaWifiMac:: GetAID(0) = " << GetAID(0) << ", m_statSlotStart=" << m_statSlotStart << ", m_lastRawDurationus = " << m_lastRawDurationus << ", m_currentslotDuration = " << m_currentslotDuration);
         		}
         	}
         	m_sharedSlotDuration = MicroSeconds (beacon.GetBeaconCompatibility().GetBeaconInterval ()) - m_lastRawDurationus;
@@ -1742,6 +1744,8 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
              fastAssocThreshold = AuthenCtrl.GetThreshold();
            }
      }
+    //if (testtrackit && IsAssociated())
+    	//NS_LOG_DEBUG ("aid = " << GetAID(0) << " S1gBeaconReceived (beacon)");
     S1gBeaconReceived (beacon);
     waitingack = false;
     outsideraw = false;
@@ -1766,13 +1770,15 @@ StaWifiMac::Receive (Ptr<Packet> packet, const WifiMacHeader *hdr)
     		{
     			sleept = m_statSlotStart[i]; // - NanoSeconds (1)
     			GoToSleep (sleept);
-        		//NS_LOG_UNCOND ("aid=" << m_aids[0] << ": Sleep now. After " <<  sleept << " sheduled wakeup.");
+    			if (testtrackit)
+        		NS_LOG_UNCOND ("aid=" << m_aids[0] << ": Sleep now. After " <<  sleept << " sheduled wakeup.");
 
     		}
     		else
     		{
     			sleept = m_statSlotStart[i];
     			Simulator::Schedule(sleept, &StaWifiMac::WakeUp, this); //own slot
+    			if (testtrackit)
         		NS_LOG_DEBUG ("aid=" << m_aids[0] << ": after " <<  sleept << " sheduled wakeup.");
 
     		}
