@@ -1356,17 +1356,63 @@ void printStatsToFile (bool print)
 			if (nodes[i]->m_nodeType == NodeEntry::CLIENT)
 			{
 				os << "\n";
-				os << "Inter-packet delay at client ms:\n";
+				os << "Inter-packet delay at client us:\n";
 				for (std::vector<Time>::const_iterator t = stats.get(i).m_interPacketDelayClient.begin(); t != stats.get(i).m_interPacketDelayClient.end(); ++t)
-					os << (*t).GetMilliSeconds()<< " ";
+					os << (*t).GetMicroSeconds()<< " ";
 				os << endl;
 				os << "Inter-packet delay at server:\n";
 				for (std::vector<Time>::const_iterator t = stats.get(i).m_interPacketDelayServer.begin(); t != stats.get(i).m_interPacketDelayServer.end(); ++t)
-					os << (*t).GetMilliSeconds()<< " ";
+					os << (*t).GetMicroSeconds()<< " ";
 				os << endl;
 				os << "Inter-packet delay deviation at client=" << stats.get(i).GetInterPacketDelayDeviation(stats.get(i).m_interPacketDelayClient) << "==" << stats.get(i).GetInterPacketDelayDeviationPercentage(stats.get(i).m_interPacketDelayClient) << endl;
 				os << "Inter-packet delay deviation at server=" << stats.get(i).GetInterPacketDelayDeviation(stats.get(i).m_interPacketDelayServer) << "==" << stats.get(i).GetInterPacketDelayDeviationPercentage(stats.get(i).m_interPacketDelayServer) << endl;
 				os << "\n";
+				os << "Packet seqs:\n";
+				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_sentTimeBySeqClient.begin(); it != stats.get(i).m_sentTimeBySeqClient.end(); ++it)
+					os << it->first << " ";
+				os << endl;
+				os << "Times sent app [us]:\n";
+				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_sentTimeBySeqClient.begin(); it != stats.get(i).m_sentTimeBySeqClient.end(); ++it)
+					os << it->second.GetMicroSeconds() << " ";
+				os << endl;
+				os << "Times received app [us]:\n";
+				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_receivedTimeBySeqClient.begin(); it != stats.get(i).m_receivedTimeBySeqClient.end(); ++it)
+					os << it->second.GetMicroSeconds() << " ";
+				os << endl;
+				os << "Time diff sent-received app [ms]:\n";
+				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_sentTimeBySeqClient.begin(); it != stats.get(i).m_sentTimeBySeqClient.end(); ++it)
+					//if (stats.get(i).m_receivedTimeBySeqClient[it->first])
+					os << stats.get(i).m_receivedTimeBySeqClient[it->first].GetMilliSeconds() - it->second.GetMilliSeconds() << " ";
+				/*else
+										os << "X";*/
+
+				os << endl;
+				os << "Time phy TX begin [us]=\n";
+				for (map<uint64_t, Time>::const_iterator it = stats.get(i).txBeginTimeMap.begin(); it != stats.get(i).txBeginTimeMap.end(); ++it)
+					os << it->second.GetMicroSeconds() << " ";
+				os << endl;
+				os << "Time phy TX end [us]=\n";
+				for (map<uint64_t, Time>::const_iterator it = stats.get(i).txEndTimeMap.begin(); it != stats.get(i).txEndTimeMap.end(); ++it)
+					os << it->second.GetMicroSeconds() << " ";
+				os << endl;
+				os << "Time phy RX begin [us]=\n";
+				for (map<uint64_t, Time>::const_iterator it = stats.get(i).rxBeginTimeMap.begin(); it != stats.get(i).rxBeginTimeMap.end(); ++it)
+					os << it->second.GetMicroSeconds() << " ";
+				os << endl;
+				/*os << "Time phy RX end [us]=\n";
+								for (map<uint64_t, Time>::const_iterator it = stats.get(i).rxEndTimeMap.begin(); it != stats.get(i).rxEndTimeMap.end(); ++it)
+									os << it->second.GetMicroSeconds() << " ";
+								os << endl;*/ // These values are equal to the m_receivedTimeBySeqClient
+				os << "dT [us]=\n";
+				std::cout << "dT =\n";
+				for (map<uint32_t, Time>::const_iterator it = stats.get(i).m_receivedTimeBySeqClient.begin(), jt = --stats.get(i).m_receivedTimeBySeqClient.end(); it != jt; ++it)
+				{
+					auto dt = stats.get(i).m_sentTimeBySeqClient[it->first + 1].GetMicroSeconds() - it->second.GetMicroSeconds();
+					os << dt << " ";
+					std::cout << dt << " ";
+				}
+				os << endl;
+				cout << endl;
 				os << "Goodput=" << (stats.get(i).getGoodputKbit(stats.TimeWhenEverySTAIsAssociated)) << "Kbit" << endl; //CORRECT
 			}
 			else

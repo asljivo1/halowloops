@@ -33,6 +33,8 @@ public:
     std::vector<Time> m_interPacketDelayServer;
     std::vector<Time> m_interPacketDelayClient;
     std::vector<Time> m_time;
+    map<uint32_t, Time> m_sentTimeBySeqClient;
+    map<uint32_t, Time> m_receivedTimeBySeqClient;
     long double GetInterPacketDelayDeviation(std::vector<Time>& delayVector);
     long double GetInterPacketDelayDeviationPercentage(std::vector<Time>& delayVector);
     Time GetAverageInterPacketDelay(std::vector<Time>& delayVector);
@@ -130,6 +132,11 @@ public:
     double getIPCameraSendingRate();
     double getIPCameraAPReceivingRate();
 
+    std::map<uint64_t, Time> txBeginTimeMap;
+    std::map<uint64_t, Time> rxBeginTimeMap;
+
+    std::map<uint64_t, Time> txEndTimeMap;
+    std::map<uint64_t, Time> rxEndTimeMap;
 };
 
 #endif /* NODESTATISTICS_H */
