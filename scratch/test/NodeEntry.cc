@@ -573,6 +573,7 @@ void NodeEntry::OnCoapPacketReceived(Ptr<const Packet> packet, Address from) {
 		auto timeDiff = (Simulator::Now() - seqTs.GetTs());
 		//cout << "=========================CLIENT SEQ " << seqTs.GetSeq() << endl;
 		//if (seqTs.GetSeq() >= 0) //allways true
+		stats->get(this->id).m_receivedTimeBySeqClient[seqTs.GetSeq()] = Simulator::Now();
 		stats->get(this->id).NumberOfSuccessfulRoundtripPacketsWithSeqHeader++;
 
 		stats->get(this->id).NumberOfSuccessfulRoundtripPackets++;
