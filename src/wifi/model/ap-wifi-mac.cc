@@ -1599,6 +1599,9 @@ void ApWifiMac::SendOneBeacon(void) {
 			int countRec = std::count (m_receivedAid.begin(), m_receivedAid.end(), aid);
 			int countFd = std::count (m_forwardedDownToAids.begin(), m_forwardedDownToAids.end(), aid);
 			m_numExpectedDlPacketsForAids.find(aid)->second += countRec - countFd;
+			// hotfix
+			if (m_numExpectedDlPacketsForAids.find(aid)->second < 0)
+				m_numExpectedDlPacketsForAids.find(aid)->second = 0;
 		}
 		RPS *p_rps;
 		NS_LOG_UNCOND ("AP -- m_sentToAids.size=" << m_sentToAids.size() << ", m_enqueuedToAids.size=" << m_enqueuedToAids.size() << ", m_numExpectedDlPacketsForAids.size()=" << m_numExpectedDlPacketsForAids.size());
