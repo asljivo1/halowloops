@@ -39,9 +39,9 @@ using namespace std;
 using namespace ns3;
 
 vector<vector<int> > CycleTimes{
-	{ 51200, 51200, 51200 },
-	{ 51200, 102400, 102400 },
-	{ 51200, 102400, 204800}
+	{ 102400, 102400 },
+	{ 51200, 102400 },
+	{ 51200, 51200 }
 };
 int numcall = 0;
 
