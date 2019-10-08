@@ -513,7 +513,7 @@ S1gRawCtr::UpdateCriticalStaInfo (std::vector<uint16_t> criticalAids, std::vecto
 					stationTransmit->m_tSent = sentTimes[i];
 					if (stationTransmit->m_tSentPrev != Time ())
 					{
-						if (stationTransmit->m_tInterval == Time ())
+						//if (stationTransmit->m_tInterval == Time ())
 							stationTransmit->m_tInterval = stationTransmit->m_tSent - stationTransmit->m_tSentPrev;
 						//else
 							//NS_ASSERT (stationTransmit->m_tInterval == stationTransmit->m_tSent - stationTransmit->m_tSentPrev);
