@@ -1248,7 +1248,8 @@ void configureCoapClients()
 void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 {
 	clientHelper.SetAttribute("MaxPackets", config.maxNumberOfPackets);
-	clientHelper.SetAttribute("Interval", TimeValue(MilliSeconds(config.cycleTime)));
+	clientHelper.SetAttribute("Interval", TimeValue(MicroSeconds(CycleTimes[numcall][n])));
+	//clientHelper.SetAttribute("Interval", TimeValue(MilliSeconds(config.cycleTime)));
 	clientHelper.SetAttribute("IntervalDeviation", TimeValue(MilliSeconds(config.cycleTime/10)));
 	clientHelper.SetAttribute("PayloadSize", UintegerValue(config.payloadSize));
 	clientHelper.SetAttribute("RequestMethod", UintegerValue(3));
@@ -1261,8 +1262,18 @@ void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 	clientApp.Get(0)->TraceConnectWithoutContext("Tx", MakeCallback(&NodeEntry::OnCoapPacketSent, nodes[n]));
 	clientApp.Get(0)->TraceConnectWithoutContext("Rx", MakeCallback(&NodeEntry::OnCoapPacketReceived, nodes[n]));
 	double random = m_rv->GetValue(0, config.cycleTime);
-	clientApp.Start(MilliSeconds(0+random));
-	clientApp.Stop(Seconds(config.simulationTime));
+	//clientApp.Start(MilliSeconds(0+random));
+	//clientApp.Stop(Seconds(config.simulationTime));
+	if (numcall == 0)
+		clientApp.Start(MicroSeconds(0+random));//0+random //37820 //33890
+	else
+		clientApp.Start(MicroSeconds(0));
+	double changeTime = config.simulationTime * (1 + numcall) / 3.;
+	double tt = config.simulationTime/3.;
+	clientApp.Stop(Seconds(changeTime));
+	Simulator::Schedule(Seconds(tt), &configureCoapClientHelper, clientHelper, n);
+	numcall++;
+	std::cout << "------------------------CHANGING COAP CLIENT CYCLE TIMEEE at " << Simulator::Now() << std::endl;
 
 }
 
