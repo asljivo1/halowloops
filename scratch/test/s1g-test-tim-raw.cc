@@ -380,6 +380,7 @@ void onSTAAssociated(int i) {
 			configureCoapServer();
 			configureCoapClients();
 		}
+		std::cout << "HERE" ;
 		updateNodesQueueLength();
 	}
 }
@@ -1247,6 +1248,8 @@ void configureCoapClients()
 
 void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 {
+	if (Simulator::Now() > Seconds (config.simulationTime))
+		return;
 	clientHelper.SetAttribute("MaxPackets", config.maxNumberOfPackets);
 	clientHelper.SetAttribute("Interval", TimeValue(MicroSeconds(CycleTimes[numcall][n])));
 	//clientHelper.SetAttribute("Interval", TimeValue(MilliSeconds(config.cycleTime)));
@@ -1272,7 +1275,8 @@ void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 	double tt = config.simulationTime/3.;
 	clientApp.Stop(Seconds(changeTime));
 	Simulator::Schedule(Seconds(tt), &configureCoapClientHelper, clientHelper, n);
-	numcall++;
+	if (n + 1 == config.nControlLoops)
+		numcall++;
 	std::cout << "------------------------CHANGING COAP CLIENT CYCLE TIMEEE at " << Simulator::Now() << std::endl;
 
 }
