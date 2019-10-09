@@ -76,6 +76,11 @@ CoapClient::GetTypeId (void)
 					UintegerValue (3),
 					MakeUintegerAccessor (&CoapClient::m_method),
 					MakeUintegerChecker<uint16_t> (1,4))
+	.AddAttribute ("StartSeq",
+					"Start sequence number for the first packet when the application starts.",
+					UintegerValue (0),
+					MakeUintegerAccessor (&CoapClient::m_sent),
+					MakeUintegerChecker<uint16_t> ())
 	.AddAttribute ("MessageType",
 				   "COAP_MESSAGE_CON = 0, COAP_MESSAGE_NON = 1, COAP_MESSAGE_ACK = 2, COAP_MESSAGE_RST = 3",
 					UintegerValue (3),
@@ -378,7 +383,7 @@ CoapClient::StopApplication (void)
 {
   NS_LOG_FUNCTION (this);
   Simulator::Cancel (m_sendEvent);
-  Simulator::Schedule(m_cooldownTime, &CoapClient::DoStopApplication, this);
+  //Simulator::Schedule(m_cooldownTime, &CoapClient::DoStopApplication, this);
 }
 
 void

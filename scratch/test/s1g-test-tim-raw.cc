@@ -380,7 +380,6 @@ void onSTAAssociated(int i) {
 			configureCoapServer();
 			configureCoapClients();
 		}
-		std::cout << "HERE" ;
 		updateNodesQueueLength();
 	}
 }
@@ -1255,6 +1254,7 @@ void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 	//clientHelper.SetAttribute("Interval", TimeValue(MilliSeconds(config.cycleTime)));
 	clientHelper.SetAttribute("IntervalDeviation", TimeValue(MilliSeconds(config.cycleTime/10)));
 	clientHelper.SetAttribute("PayloadSize", UintegerValue(config.payloadSize));
+	clientHelper.SetAttribute("StartSeq", UintegerValue(stats.get(n).NumberOfSentPackets));
 	clientHelper.SetAttribute("RequestMethod", UintegerValue(3));
 	clientHelper.SetAttribute("MessageType", UintegerValue(0));
 	clientHelper.SetAttribute("CooldownTime", TimeValue(Seconds(config.CoolDownPeriod)));
@@ -1273,12 +1273,10 @@ void configureCoapClientHelper(CoapClientHelper& clientHelper, uint32_t n)
 		clientApp.Start(MicroSeconds(0));
 	double changeTime = config.simulationTime * (1 + numcall) / 3.;
 	double tt = config.simulationTime/3.;
-	clientApp.Stop(Seconds(changeTime));
+	clientApp.Stop(Seconds(tt));
 	Simulator::Schedule(Seconds(tt), &configureCoapClientHelper, clientHelper, n);
 	if (n + 1 == config.nControlLoops)
 		numcall++;
-	std::cout << "------------------------CHANGING COAP CLIENT CYCLE TIMEEE at " << Simulator::Now() << std::endl;
-
 }
 
 void printStatsToFile (bool print)
