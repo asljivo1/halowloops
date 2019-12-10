@@ -1509,6 +1509,15 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    	{
 	    		obj += w[i][h]*c[i];
 	    		sumwh += w[i][h];
+	    		if (i <= m - 2)
+	    		{
+	    			for (int j = i + 1; j < m; j++)
+	    			{
+	    				vname.str("");
+	    				vname << "CON_v_" << i << "." << j << "." << h;
+	    				model.addQConstr(v[i][j][h] == u[i][h]*d[j][h], vname.str());
+	    			}
+	    		}
 	    	}
 	    	model.addConstr(sumwh <= 1, vname.str());
 	    	vname.str("");
