@@ -1502,8 +1502,6 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    GRBQuadExpr obj (0);
 	    for (int i = 0; i < m; i++)
 	    {
-	    	vname.str("");
-	    	vname << "CON_40_" << i;
 	    	GRBLinExpr sumwh (0);
 	    	for (int h = 0; h < n; h++)
 	    	{
@@ -1519,6 +1517,8 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 	    			}
 	    		}
 	    	}
+	    	vname.str("");
+	    	vname << "CON_40_" << i;
 	    	model.addConstr(sumwh <= 1, vname.str());
 	    	vname.str("");
 	    	vname << "CON_44.left_" << i;
