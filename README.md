@@ -1,4 +1,4 @@
-[Installation instructions for CoAP support](../../wiki/Installation instructions for CoAP support)
+[Installation instructions for CoAP support](../../wiki/Home)
 
 ### Installation and usage instructions ###
 
