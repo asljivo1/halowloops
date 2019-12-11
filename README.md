@@ -1,5 +1,7 @@
 [Installation instructions for CoAP support](../../wiki/CoAP)
 
+[Installation instructions for Gurobi solver support](../../wiki/Gurobi)
+
 ### Installation and usage instructions ###
 
 * Download source code from our repository.
