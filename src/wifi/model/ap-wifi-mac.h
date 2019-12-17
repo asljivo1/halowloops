@@ -384,6 +384,8 @@ private:
   Time m_sharedSlotDuration;
   std::vector<std::vector<uint32_t> > m_loopAids;
   bool m_updateRps;
+  uint16_t m_m;
+  uint32_t m_pktTxTimeReserve;
 
   Time m_scheduleTransmissionForNextSlotIfLessThan;
   bool m_alwaysScheduleForNextSlot;

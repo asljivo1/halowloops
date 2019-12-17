@@ -107,6 +107,15 @@ TypeId ApWifiMac::GetTypeId(void) {
 						MakeUintegerAccessor(&ApWifiMac::GetRawGroupInterval,
 						&ApWifiMac::SetRawGroupInterval),
 						MakeUintegerChecker<uint32_t>())
+			.AddAttribute("m", "Max number of RAW groups for the MIP.",
+						UintegerValue(32),
+						MakeUintegerAccessor(&ApWifiMac::m_m),
+						MakeUintegerChecker<uint16_t>())
+			.AddAttribute("pktTxTimeReserve",
+						"Time to reserve for a single packet transmission in MIP in microseconds.",
+						UintegerValue(5000),
+						MakeUintegerAccessor(&ApWifiMac::m_pktTxTimeReserve),
+						MakeUintegerChecker<uint32_t>())
 			.AddAttribute("NRawStations", "Number of total stations support RAW",
 						UintegerValue(100),
 						MakeUintegerAccessor(&ApWifiMac::GetTotalStaNum,
@@ -1605,7 +1614,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		if (this->m_criticalAids.size()) //
 		{
 			RPS rps;
-			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, m_numExpectedDlPacketsForAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, this->m_outputpath, m_simulationTime);
+			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, m_numExpectedDlPacketsForAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, this->m_outputpath, m_simulationTime, m_m, m_pktTxTimeReserve);
 			m_aidsForcePage = m_S1gRawCtr.GetAidsToForcePage();
 
 			UpdateQueues(rps);

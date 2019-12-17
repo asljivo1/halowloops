@@ -42,6 +42,8 @@ Configuration::Configuration(int argc, char *argv[]) {
     cmd.AddValue("CycleTime", "Cycle time of all control loops", cycleTime);
     cmd.AddValue("EnableVirtualAids", "Enable the use of virtual AIDs", enableVirtualAids);
     cmd.AddValue("MaxNumPackets", "Maximum number of packets that APP can send (up to 4294967295u)", maxNumberOfPackets);
+    cmd.AddValue("TxTimeMip", "Time to reserve for a single packet transmission in MIP in microseconds.", pktTxTimeReserve);
+    cmd.AddValue("m", "Max number of RAW groups for the MIP.", m);
     cmd.AddValue("ProcessingDelay", "Processing delay at control loop server in ms.", processingDelay);
 
 /*

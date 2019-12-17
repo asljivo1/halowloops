@@ -1384,7 +1384,7 @@ S1gRawCtr::IsInfoAvailableForAllSta()
 
 //Second attempt
 bool
-S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath, Time simulationTime)
+S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, uint32_t m, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time tProcessing, std::string outputpath, Time simulationTime, uint32_t tPacketTx)
 {
 	if (!IsInfoAvailableForAllSta())
 	    	 return false;
@@ -1420,7 +1420,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 		GRBModel model = GRBModel(env);
 
 		//Constants that will be used in the model
-		uint32_t MaxChannelTime, BeaconTxTimeMin (2040), tPacketTx (5000); //us
+		uint32_t MaxChannelTime, BeaconTxTimeMin (2040); //us
 	    MaxChannelTime = BeaconInterval - BeaconTxTimeMin; //us
 	    std::sort(criticalList.begin(), criticalList.end());
 
@@ -1998,7 +1998,7 @@ S1gRawCtr::OptimizeRaw (std::vector<uint16_t> criticalList, std::vector<uint16_t
 }
 // Beacon duration), before that use NGroup=1 and initialize by ap-wifi-mac
 RPS
-S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, std::map<uint16_t,uint16_t> numExpectedDlPacketsForAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath, Time simulationTime)
+S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<uint16_t> sensorList, std::vector<uint16_t> offloadList, std::vector<uint16_t> receivedFromAids, std::vector<Time> receivedTimes, std::vector<Time> sentTimes, std::vector<uint16_t> sentToAids, std::vector<uint16_t> enqueuedToAids, std::map<uint16_t,uint16_t> numExpectedDlPacketsForAids, uint64_t BeaconInterval, RPS *prevRps, pageSlice pageslice, uint8_t dtimCount, Time bufferTimeToAllowBeaconToBeReceived, std::string outputpath, Time simulationTime, uint16_t m, uint32_t pktTxTimeReserve)
  {
      NS_ASSERT ("S1gRawCtr should not be called");
      //gandalf ();
@@ -2161,7 +2161,7 @@ S1gRawCtr::UpdateRAWGroupping (std::vector<uint16_t> criticalList, std::vector<u
     		 //DistributeStationsToRaws ();
     		 std::cout << std::endl << std::endl;
     		 Time startTime = Simulator::Now();
-    		 m_success = OptimizeRaw(criticalList, sensorList, 32, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath, simulationTime);
+    		 m_success = OptimizeRaw(criticalList, sensorList, m, BeaconInterval, prevRps, pageslice, dtimCount, tProcessing, outputpath, simulationTime, pktTxTimeReserve);
 
 
     		 if (!m_success)

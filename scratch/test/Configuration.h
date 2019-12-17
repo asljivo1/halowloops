@@ -77,6 +77,9 @@ struct Configuration {
 	string APPcapFile = "appcap"; // empty string if no visualization TODO
 	string NSSFile = "test.nss";
 
+	uint16_t m = 32; //- for MIP
+	uint32_t pktTxTimeReserve = 5000; //us - for MIP
+
 	/*
 	 * Le's config params
 	 * */

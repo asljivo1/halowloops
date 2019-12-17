@@ -1720,8 +1720,9 @@ int main(int argc, char *argv[]) {
 	                 "PageSliceSet", pageSliceValue (config.pageS),
 	                 "TIMSet", TIMValue (config.tim),
 	                 "Outputpath", StringValue(config.NSSFile),
-	                 "SimulationTime", TimeValue (Seconds (config.simulationTime))
-	               );
+	                 "SimulationTime", TimeValue (Seconds (config.simulationTime)),
+	                 "pktTxTimeReserve", UintegerValue (config.pktTxTimeReserve),
+	                 "m", UintegerValue (config.m));
 
 	phy.Set("TxGain", DoubleValue(3.0));
 	phy.Set("RxGain", DoubleValue(3.0));
