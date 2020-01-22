@@ -1614,7 +1614,7 @@ void ApWifiMac::SendOneBeacon(void) {
 		if (this->m_criticalAids.size()) //
 		{
 			RPS rps;
-			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, m_numExpectedDlPacketsForAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, this->m_outputpath, m_simulationTime, m_m, m_pktTxTimeReserve);
+			rps = m_S1gRawCtr.UpdateRAWGroupping(this->m_criticalAids, this->m_sensorAids, this->m_offloadAids,this->m_receivedAid, this->m_receivedTimes, m_sentTimes, m_sentToAids, this->m_enqueuedToAids, m_numExpectedDlPacketsForAids, this->GetBeaconInterval().GetMicroSeconds(), this->m_rpsset.rpsset.back(), this->m_pageslice, m_DTIMCount, m_bufferTimeToAllowBeaconToBeReceived, this->m_outputpath, m_simulationTime, this->m_criticalAids.size()*8+1, m_pktTxTimeReserve);
 			m_aidsForcePage = m_S1gRawCtr.GetAidsToForcePage();
 
 			UpdateQueues(rps);
