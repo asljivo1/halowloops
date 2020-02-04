@@ -115,7 +115,7 @@ void RAWGroupping (uint16_t Numsta, uint16_t NGroups, uint16_t NumSlot, uint16_t
      		switch (mcsindex)
      		{
      		case 0: SlotDurationCount = 19; break;
-     		case 8: SlotDurationCount = 10; break;
+     		case 8: SlotDurationCount = 21; break;
      		default: std::cout << "MCS" << mcsindex << " not supported!" << std::endl; break;
      		}
      		newfile << RawControl << "\t" << SlotCrossBoundary << "\t" << SlotFormat << "\t" << SlotDurationCount << "\t" << SlotNum << "\t" << pageIndex << "\t" << aid_start << "\t" << aid_end << "\t" << "\n";
